@@ -1,5 +1,6 @@
 import os
 import sys
+import signal
 import time
 from PyQt5.QtWidgets import *
 from PyQt5.QtGui import *
@@ -59,18 +60,20 @@ class GUITool(QWidget):
             print("[{0}] 자식 프로세스[1] 종료".format(os.getpid()))
             exit()
 
-        # pid2 = os.fork()
-        # if pid2 == 0:
-        #     print("[{0}] 자식 프로세스[2] 시작".format(os.getpid()))
-        #     time.sleep(1)
-        #     print("[{0}] 자식 프로세스[2] 종료".format(os.getpid()))
-        #     exit()
+        pid2 = os.fork()
+        if pid2 == 0:
+            print("[{0}] 자식 프로세스[2] 시작".format(os.getpid()))
+            time.sleep(1)
+            print("[{0}] 자식 프로세스[2] 종료".format(os.getpid()))
+            exit()
 
-        # child1 = os.waitpid(pid1)
-        # print("[{0}] 자식 프로세스 {1} 종료".format(os.getpid(), child1))
-        # child2 = os.waitpid(pid2)
-        # print("[{0}] 자식 프로세스 {1} 종료".format(os.getpid(), child2))
-
+        child1 = os.waitpid(pid1)
+        print("[{0}] 자식 프로세스 {1} 종료".format(os.getpid(), child1))
+        child2 = os.waitpid(pid2)
+        print("[{0}] 자식 프로세스 {1} 종료".format(os.getpid(), child2))
+		
+		os.kill(pid1, signal.SIGTERM)
+		os.kill(pid2, signal.SIGTERM)
 if __name__ == '__main__':
     app = QApplication(sys.argv)
     ex = GUITool()
