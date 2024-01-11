@@ -1,5 +1,6 @@
 import os
 import sys
+import time
 from PyQt5.QtWidgets import *
 from PyQt5.QtGui import *
 
@@ -42,11 +43,33 @@ class GUITool(QWidget):
         self.btn_list[0].setEnabled(False)
         self.btn_list[1].setEnabled(True)
         self.status_label.setText('RUN > > ')
+        self.run_child_processes()
 
     def click_stopBtn(self):
         self.btn_list[0].setEnabled(True)
         self.btn_list[1].setEnabled(False)
         self.status_label.setText('KILL and SAVE !')
+
+    def run_child_processes(self):
+        print("[{0}] 부모 프로세스 시작".format(os.getpid()))
+        pid1 = os.fork()
+        if pid1 == 0:
+            print("[{0}] 자식 프로세스[1] 시작".format(os.getpid()))
+            time.sleep(1)
+            print("[{0}] 자식 프로세스[1] 종료".format(os.getpid()))
+            exit()
+
+        # pid2 = os.fork()
+        # if pid2 == 0:
+        #     print("[{0}] 자식 프로세스[2] 시작".format(os.getpid()))
+        #     time.sleep(1)
+        #     print("[{0}] 자식 프로세스[2] 종료".format(os.getpid()))
+        #     exit()
+
+        # child1 = os.waitpid(pid1)
+        # print("[{0}] 자식 프로세스 {1} 종료".format(os.getpid(), child1))
+        # child2 = os.waitpid(pid2)
+        # print("[{0}] 자식 프로세스 {1} 종료".format(os.getpid(), child2))
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)
