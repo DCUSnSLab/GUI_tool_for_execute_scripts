@@ -1,5 +1,7 @@
+#!/usr/bin/env python
 import os
 import sys
+import subprocess
 import signal
 import time
 from PyQt5.QtWidgets import *
@@ -14,6 +16,9 @@ class GUITool(QWidget):
         self.btn_list[1].setMaximumHeight(500)
         self.btn_list[1].clicked.connect(self.click_stopBtn)
         self.status_label = QLabel('')
+
+        self.child1 = 0
+        self.child2 = 0
 
         # 버튼을 비활성화하는 메소드를 사용합니다.
         self.btn_list[1].setEnabled(False)
@@ -44,36 +49,41 @@ class GUITool(QWidget):
         self.btn_list[0].setEnabled(False)
         self.btn_list[1].setEnabled(True)
         self.status_label.setText('RUN > > ')
-        self.run_child_processes()
+        self.start_child_processes()
 
     def click_stopBtn(self):
         self.btn_list[0].setEnabled(True)
         self.btn_list[1].setEnabled(False)
+        #self.kill_child_processes()
         self.status_label.setText('KILL and SAVE !')
 
-    def run_child_processes(self):
-        print("[{0}] 부모 프로세스 시작".format(os.getpid()))
-        pid1 = os.fork()
-        if pid1 == 0:
-            print("[{0}] 자식 프로세스[1] 시작".format(os.getpid()))
-            time.sleep(1)
-            print("[{0}] 자식 프로세스[1] 종료".format(os.getpid()))
-            exit()
+    def run_script(self, file_name: str):
+        process = subprocess.Popen(["./" + file_name])
+        return process.pid
 
-        pid2 = os.fork()
-        if pid2 == 0:
-            print("[{0}] 자식 프로세스[2] 시작".format(os.getpid()))
-            time.sleep(1)
-            print("[{0}] 자식 프로세스[2] 종료".format(os.getpid()))
-            exit()
+    def start_child_processes(self):
+        self.child1 = os.fork()
 
-        child1 = os.waitpid(pid1)
-        print("[{0}] 자식 프로세스 {1} 종료".format(os.getpid(), child1))
-        child2 = os.waitpid(pid2)
-        print("[{0}] 자식 프로세스 {1} 종료".format(os.getpid(), child2))
-		
-		os.kill(pid1, signal.SIGTERM)
-		os.kill(pid2, signal.SIGTERM)
+        if self.child1 == 0:
+            self.child1 = self.run_script("test1.sh")
+            sys.exit(0)
+        else:
+            self.child2 = os.fork()
+
+            if self.child2 == 0:
+                self.child2 = self.run_script("test2.sh")
+                sys.exit(0)
+            else:
+                #pid1, status1 = os.waitpid(self.child1, 0)
+                #pid2, status2 = os.waitpid(self.child2, 0)
+                print("Child 1 PID: ", self.child1)
+                print("Child 2 PID: ", self.child2)
+
+    def kill_child_processes(self):
+        print("STOP BUTTON is PUSHED .")
+        os.kill(self.child1, signal.SIGTERM)
+        os.kill(self.child2, signal.SIGTERM)
+
 if __name__ == '__main__':
     app = QApplication(sys.argv)
     ex = GUITool()
