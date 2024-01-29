@@ -21,8 +21,8 @@ class MyMainWindow(QWidget):
         for btn in self.btn_list:
             btn.setMaximumWidth(250)
             btn.setMaximumHeight(150)
-        self.btn_list[1].setStyleSheet("background-color: red; color: white; cursor: pointer")
-        self.btn_list[2].setStyleSheet("background-color: black; color: white; cursor: pointer")
+        self.btn_list[1].setStyleSheet("background-color: red; color: white")
+        self.btn_list[2].setStyleSheet("background-color: black; color: white")
 
         # 스크립트를 실행시키는 역할입니다.
         # ROI 위치를 설정하는 GUI창이 뜨며, ROI 위치를 조정한 뒤 [OK] 버튼을 누르면, 해당 ROI 위치를 기반으로 스크립트가 실행됩니다.
@@ -58,23 +58,28 @@ class MyMainWindow(QWidget):
         qr.moveCenter(cp)
         self.move(qr.topLeft())
     def exe_script(self):
-        self.child_process = os.fork()
-        if self.child_process == 0:
-            subprocess.run(["python", "./execute_files/tmp.py"])  # 실행 환경에 따라 경로 설정이 필요합니다.
-            self.status_label.setText("RECORDING . . . YOU CAN STOP with [STOP]")
-        else:
-            return self.child_process
+        self.status_label.setText("RECORDING . . . YOU CAN STOP with [STOP]")
+        command = ["python", "./test_files/file_down_test.py", str(self.roi_box[0]), str(self.roi_box[1])]
+        self.child_process = subprocess.Popen(command)
+        #self.child_process = os.fork()
+        # if self.child_process == 0:
+        print("CHILD PROCESS: {0}".format(os.getpid()))
+            # subprocess.run(command)  # 실행 환경에 따라 경로 설정이 필요합니다.
+            # os.system("python ./test_files/file_down_test.py 10 10")
+        # else:
+        #     print("PARENT PROCESS: {0}".format(os.getpid()))
+            # return self.child_process
     def click_start(self):
         ROI_window = ROIWindow()
         if ROI_window.exec_() == QDialog.Accepted:
             self.roi_box = ROI_window.get_coordinates()
-        # ROI_window.exec_()
         self.btn_list[0].setEnabled(False)
         self.btn_list[1].setEnabled(True)
         self.exe_script()
     def click_stop(self):
         # 스크립트가 돌아가는 child_process를 kill합니다.
-        os.kill(self.child_process, signal.SIGTERM)
+        # os.kill(pid, signal.SIGTERM)
+        self.child_process.terminate()
         # 각 버튼의 활성 상태를 바꿉니다.
         self.status_label.setText("EXCEL FILE SAVED ! Press [START] to start recording . . .")
         self.btn_list[0].setEnabled(True)
@@ -161,7 +166,7 @@ class ROIWindow(QDialog):
                 self.clk_x = ev.pos().x()
                 self.clk_y = ev.pos().y()
                 self.roi_box = QGraphicsRectItem(QRectF(self.clk_x, self.clk_y, 1024, 512))
-                print("[Click] x: {0} , y: {1}".format(ev.globalPos().x(), ev.globalPos().y()))
+                print("[Click] x: {0} , y: {1}".format(ev.pos().x(), ev.pos().y()))
                 self.roi_box.setBrush(QBrush(Qt.transparent))
                 self.roi_box.setPen(QPen(Qt.red, 10, Qt.SolidLine))
                 self.scene.addItem(self.roi_box)
