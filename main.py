@@ -65,13 +65,13 @@ class GUITool(QWidget):
         self.child1 = os.fork()
 
         if self.child1 == 0:
-            self.child1 = self.run_script("test1.sh")
+            self.child1 = self.run_script("execute_files/test1.sh")
             sys.exit(0)
         else:
             self.child2 = os.fork()
 
             if self.child2 == 0:
-                self.child2 = self.run_script("test2.sh")
+                self.child2 = self.run_script("execute_files/test2.sh")
                 sys.exit(0)
             else:
                 #pid1, status1 = os.waitpid(self.child1, 0)
