@@ -5,17 +5,34 @@ import subprocess
 import signal
 import cv2
 from PyQt5.QtWidgets import *
-from PyQt5.QtCore import Qt, QRectF, QPoint, QSize, QEvent, QTimer
+from PyQt5.QtCore import Qt, QRectF, QTimer
 from PyQt5.QtGui import *
+
+# ROI 영역 지정에 사용되는 카메라의 해상도입니다. 이 비율에 맞게 ROI 영역의 좌표가 보정됩니다.
+# 기본 해상도는 1920 * 1080 (100%)입니다. 사용하는 모니터의 비율보다 한 단계 낮게 설정해주세요.
+# 1920 * 1080 (1.0)
+# 1280 * 720 (0.66)
+# 960 * 540 (0.5)
+CAM_WIDTH = int(1280)   # 1920 / 1280 / 960
+CAM_HEIGHT = int(720)  # 1080 / 720 / 540
+CAM_SCALE = float(2 / 3)  # 1.0 / 3분의2 / 0.5
+
+# 수정할 필요 없는 상수입니다.
+ROI_WIDTH = int(1024 * CAM_SCALE)
+ROI_HEIGHT = int(512 * CAM_SCALE)
+ROI_SCALE = float(CAM_SCALE ** -1)
 
 class MyMainWindow(QWidget):
     def __init__(self):
         super().__init__()
         # 스크립트 파일을 실행시킬 자식 프로세스입니다.
         self.child_process = None
-
         # 스크립트 파일에 매개변수(parameter)로 들어갈 변수 리스트입니다.
         self.script_param = []
+
+        self.from_path = "."    # 데이터 파일이 저장될 경로입니다. 파일 선택기로 선택한 디렉토리여야 하며, 끝에 슬래시가 붙지 않습니다. 사용할 때 주의하시길 바랍니다.
+        self.to_path = ".."     # 데이터 파일을 복사할 타겟 경로입니다. from_path와 마찬가지입니다.
+        self.data_list = []
 
         self.btn_list = [QPushButton("START"), QPushButton("STOP"), QPushButton("DOWNLOAD")]
         for btn in self.btn_list:
@@ -59,17 +76,11 @@ class MyMainWindow(QWidget):
         self.move(qr.topLeft())
     def exe_script(self):
         self.status_label.setText("RECORDING . . . YOU CAN STOP with [STOP]")
-        command = ["python", "./test_files/file_down_test.py", str(self.roi_box[0]), str(self.roi_box[1])]
+        command = ["python", "./test/file_down_test.py", self.from_path, str(self.roi_box[0]), str(self.roi_box[1])]  # 실행할 파일의 경로를 입력하세요.
         self.child_process = subprocess.Popen(command)
-        #self.child_process = os.fork()
-        # if self.child_process == 0:
         print("CHILD PROCESS: {0}".format(os.getpid()))
-            # subprocess.run(command)  # 실행 환경에 따라 경로 설정이 필요합니다.
-            # os.system("python ./test_files/file_down_test.py 10 10")
-        # else:
-        #     print("PARENT PROCESS: {0}".format(os.getpid()))
-            # return self.child_process
     def click_start(self):
+        self.from_path = QFileDialog.getExistingDirectory(self, "Path to SAVE Data File", ".")
         ROI_window = ROIWindow()
         if ROI_window.exec_() == QDialog.Accepted:
             self.roi_box = ROI_window.get_coordinates()
@@ -85,57 +96,60 @@ class MyMainWindow(QWidget):
         self.btn_list[0].setEnabled(True)
         self.btn_list[1].setEnabled(False)
     def click_download(self):
-        # 새 창을 띄워서 파일을 관리하는 코드를 작성할 것.
-        print()
+        self.to_path = QFileDialog.getExistingDirectory(self, "Path to COPY Data File", ".")
+        self.get_data_files()
+        # self.data_list = os.listdir(self.from_path) ** test_edit **
+        download_window = DownloadWindow(self.from_path, self.data_list, self.to_path)
+        if download_window.exec_() == QDialog.Accepted:
+            download_window.copy_files()
+    def get_data_files(self):
+        self.data_list = []
+        for file in os.listdir(self.from_path):
+            if file.endswith(".xls") or file.endswith(".xlsx"):
+                self.data_list.append(file)
 
 class ROIWindow(QDialog):
     def __init__(self):
         super().__init__()
         self.init_UI()
     def init_UI(self):
-        # ROI 영역의 좌표를 표시하는 레이블 구역입니다.
-        # self.p1_coord = QTextEdit("")
-        # self.p2_coord = QTextEdit("")
-        # self.p1_coord.setReadOnly(True)
-        # self.p2_coord.setReadOnly(True)
-        # label_layout = QHBoxLayout(self)
-        # label_layout.addWidget(QLabel("p1(LEFT-TOP) : "), 2, Qt.AlignCenter)
-        # label_layout.addWidget(self.p1_coord, 1, Qt.AlignLeft)
-        # label_layout.addWidget(QLabel("p2(RIGHT-BOTTOM) : "), 2, Qt.AlignCenter)
-        # label_layout.addWidget(self.p2_coord, 1, Qt.AlignLeft)
-
         # 확인 버튼입니다.
         self.ok_btn = QPushButton("OK", self)
         self.ok_btn.clicked.connect(self.click_ok)
-        self.ok_btn.setGeometry(900, 1135, 200, 40)
+        self.ok_btn.setGeometry(int(CAM_WIDTH / 2) - 70, CAM_HEIGHT + 45, 200, 60)
 
         self.img_label = QLabel(self)        # 실시간 카메라 영상을 띄울 공간입니다.
-        self.img_label.setGeometry(40, 50, 1920, 1080)
-        # self.img_label.resize(1920, 1080)    # 카메라 해상도입니다.
-        self.installEventFilter(self) # 영상에 마우스 이벤트 필터를 추가합니다.
+        self.img_label.setGeometry(30, 30, CAM_WIDTH, CAM_HEIGHT)   # 이 좌표를 기반으로 ROI의 좌표 보정이 들어갑니다.
+        self.img_label.resize(CAM_WIDTH, CAM_HEIGHT)    # 카메라 해상도입니다.
+        self.installEventFilter(self)   # 영상에 마우스 이벤트 필터를 추가합니다.
 
         timer = QTimer(self)    # 실시간 카메라 영상의 프레임을 업데이트하는 타이머입니다.
         timer.timeout.connect(self.update_frame)
         timer.start(10) # 초당 10 프레임입니다.
 
         self.capture = cv2.VideoCapture(0)  # 카메라를 연결합니다.
-        self.capture.set(cv2.CAP_PROP_FRAME_WIDTH, 1920)
-        self.capture.set(cv2.CAP_PROP_FRAME_HEIGHT, 1080)
+        self.capture.set(cv2.CAP_PROP_FRAME_WIDTH, CAM_WIDTH)
+        self.capture.set(cv2.CAP_PROP_FRAME_HEIGHT, CAM_HEIGHT)
 
         self.scene = QGraphicsScene(self)
         self.scene.setBackgroundBrush(Qt.transparent)  # 배경을 투명하게 설정
         self.view = QGraphicsView(self.scene, self)
         self.view.setStyleSheet("background: transparent;")  # 배경을 투명하게 설정
-        self.view.setSceneRect(0, 0, 2000, 1180)
-        self.view.setGeometry(0, 0, 2000, 1180)
-        self.view.setFixedSize(2000, 1180)
+        self.view.setSceneRect(0, 0, CAM_WIDTH + 60, CAM_HEIGHT + 120)
+        self.view.setGeometry(0, 0, CAM_WIDTH + 60, CAM_HEIGHT + 120)
+        self.view.setFixedSize(CAM_WIDTH + 60, CAM_HEIGHT + 120)
         self.view.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self.view.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-        self.roi_box = None
+
+        self.roi_box = QGraphicsRectItem(QRectF(int(30 + float(CAM_WIDTH / 2) - float(ROI_WIDTH / 2)), int(30 + float(CAM_HEIGHT / 2) - float(ROI_HEIGHT / 2)), int(1024 * CAM_SCALE), int(512 * CAM_SCALE)))
+        self.roi_box.setBrush(QBrush(Qt.transparent))
+        self.roi_box.setPen(QPen(Qt.green, 10, Qt.SolidLine))
+        self.clk_x = int(30 + float(CAM_WIDTH / 2) - float(ROI_WIDTH / 2))
+        self.clk_y = int(30 + float(CAM_HEIGHT / 2) - float(ROI_HEIGHT / 2))
         self.scene.addItem(self.roi_box)
 
         self.setWindowTitle("SET ROI POSITION > >")
-        self.setFixedSize(2000, 1180)
+        self.setFixedSize(CAM_WIDTH + 60, CAM_HEIGHT + 120)
         self.set_window_center()
         self.show()
     def set_window_center(self):
@@ -158,23 +172,87 @@ class ROIWindow(QDialog):
             self.img_label.setPixmap(QPixmap.fromImage(q_img))
     def mousePressEvent(self, ev):
         if ev.button() == Qt.LeftButton:  # 좌클릭인 경우
-            if self.ok_btn.geometry().contains(ev.pos()):
+            if self.ok_btn.geometry().contains(ev.pos()):   # 버튼을 클릭한 경우
                 self.ok_btn.click()
-            else:
-                if self.roi_box != None:
-                    self.scene.removeItem(self.roi_box)
+            else:   # 버튼이 아닌 영역을 클릭한 경우
+                self.scene.removeItem(self.roi_box)
                 self.clk_x = ev.pos().x()
                 self.clk_y = ev.pos().y()
-                self.roi_box = QGraphicsRectItem(QRectF(self.clk_x, self.clk_y, 1024, 512))
-                print("[Click] x: {0} , y: {1}".format(ev.pos().x(), ev.pos().y()))
+                self.roi_box = QGraphicsRectItem(QRectF(self.clk_x, self.clk_y, ROI_WIDTH, ROI_HEIGHT))
+                print("[Click] x: {0} , y: {1}".format(ev.pos().x() - 30, ev.pos().y() - 30))
                 self.roi_box.setBrush(QBrush(Qt.transparent))
-                self.roi_box.setPen(QPen(Qt.red, 10, Qt.SolidLine))
+                self.roi_box.setPen(QPen(Qt.green, 10, Qt.SolidLine))
                 self.scene.addItem(self.roi_box)
-                print("[Box] x: {0} , y: {1}".format(self.roi_box.scenePos().x(), self.roi_box.scenePos().y()))
                 self.update()
                 super().mousePressEvent(ev)
     def get_coordinates(self):
-        return [self.clk_x, self.clk_y]
+        return [self.clk_x - 30, self.clk_y - 30]
+
+class DownloadWindow(QDialog):
+    def __init__(self, from_path: str, data_list: list, to_path: str):
+        super().__init__()
+        self.from_path = from_path
+        print(from_path)
+        self.data_list = data_list
+        self.to_path = to_path
+        print(to_path)
+        self.init_UI()
+    def init_UI(self):
+        self.data_model = QStandardItemModel()
+        self.data_model.setColumnCount(1)
+        self.data_model.setHorizontalHeaderLabels(["Select", "File Name"])
+        for file in self.data_list:
+            item = QStandardItem(file)
+            item.setCheckable(True)
+            self.data_model.appendRow(item)
+
+        self.select_all_btn = QPushButton("Select All", self)
+        self.select_all_btn.clicked.connect(self.select_all)
+
+        self.copy_btn = QPushButton("COPY", self)
+        self.copy_btn.clicked.connect(self.click_copy)
+
+        self.list_view = QListView()
+        self.list_view.setModel(self.data_model)
+
+        main_layout = QVBoxLayout(self)
+        main_layout.addWidget(QLabel(self.from_path.split('/')[-1] + " -> " + self.to_path.split('/')[-1]))
+        main_layout.addWidget(self.select_all_btn)
+        main_layout.addWidget(self.list_view)
+        main_layout.addWidget(self.copy_btn)
+
+        self.setLayout(main_layout)
+        self.setWindowTitle("SELECT DATA FILES to COPY > >")
+        self.setFixedSize(1000, 800)
+        self.set_window_center()
+        self.setFont(QFont("Arial", 10))
+        self.show()
+    def set_window_center(self):
+        qr = self.frameGeometry()
+        cp = QDesktopWidget().availableGeometry().center()
+        qr.moveCenter(cp)
+        self.move(qr.topLeft())
+    def click_copy(self):
+        self.accept()
+    def select_all(self):
+        for i in range(len(self.data_list)):
+            self.data_model.item(i, 0).setCheckState(Qt.Checked)
+    def copy_files(self):
+        for i in range(len(self.data_list)):
+            if self.data_model.item(i, 0).checkState() == 2:
+                try:
+                    from_file = open(self.from_path + "/" + self.data_model.item(i, 0).text(), "r")
+                    to_file = open(self.to_path + "/" + self.data_model.item(i, 0).text(), "w")
+                    data = from_file.read()
+                    to_file.write(data)
+                    from_file.close()
+                    to_file.close()
+                except FileNotFoundError:
+                    print("File not found")
+                except Exception as e:
+                    print("An error occurred", e)
+                except PermissionError:
+                    print("Permission denied !")
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
