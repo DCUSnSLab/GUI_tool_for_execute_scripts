@@ -18,7 +18,7 @@ def exit_handler(signum, frame):
     # excel_file.close()
     # print("Excel File Saved !")
     for i in range(3):
-        excel_file = open(str(sys.argv[1]) + str(i + 1) + str(time.strftime("%H시-%M분")) + ".xls", "w")
+        excel_file = open(str(sys.argv[1]) + "/" + str(time.strftime("%M분-%s초_")) + str(i + 1) + ".xls", "w")
         excel_file.close()
         print("Excel File {0} Saved !".format(i + 1))
     sys.exit()
