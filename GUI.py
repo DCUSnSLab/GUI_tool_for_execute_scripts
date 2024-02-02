@@ -13,9 +13,9 @@ from PyQt5.QtGui import *
 # 1920 * 1080 (1.0)
 # 1280 * 720 (0.66)
 # 960 * 540 (0.5)
-CAM_WIDTH = int(1920)   # 1920 / 1280 / 960
-CAM_HEIGHT = int(1080)  # 1080 / 720 / 540
-CAM_SCALE = float(1.0)  # 1.0 / 3분의2 / 0.5
+CAM_WIDTH = int(1280)   # 1920 / 1280 / 960
+CAM_HEIGHT = int(720)  # 1080 / 720 / 540
+CAM_SCALE = float(2 / 3)  # 1.0 / 3분의2 / 0.5
 
 # 수정할 필요 없는 상수입니다.
 ROI_WIDTH = int(1024 * CAM_SCALE)
@@ -30,7 +30,7 @@ class MyMainWindow(QWidget):
         # 스크립트 파일에 매개변수(parameter)로 들어갈 변수 리스트입니다.
         self.script_param = []
 
-        self.from_path = "."    # 데이터 파일이 저장될 경로입니다. 파일 선택기로 선택한 디렉토리여야 하며, 끝에 슬래시가 붙지 않습니다. 사용할 때 주의하시길 바랍니다.
+        self.from_path = "."    # 데이터 파일이 저장되어있는 경로입니다. 파일 선택기로 선택한 디렉토리여야 하며, 끝에 슬래시가 붙지 않습니다. 사용할 때 주의하시길 바랍니다.
         self.to_path = ".."     # 데이터 파일을 복사할 타겟 경로입니다. from_path와 마찬가지입니다.
         self.data_list = []
 
@@ -75,13 +75,14 @@ class MyMainWindow(QWidget):
         qr.moveCenter(cp)
         self.move(qr.topLeft())
     def exe_script(self):
-        self.status_label.setText("RECORDING . . . YOU CAN STOP with [STOP]")
+        self.status_label.setText("SCRIPT RUNNING . . . YOU CAN STOP with [STOP] to SAVE DATA")
+        # 실행할 파일의 경로를 입력하세요.
+        command = ["python3}, }./test/segnet-camera_last_last.py", "--network=fcn-resnet18-cityscapes-1024x512", f"--x_coord={str(self.roi_box[0])}", f"--y_coord={str(self.roi_box[1])}", f"--reversed={str(self.roi_box[2])}"]
         # command = ["python3", "./test/segnet-camera_last_last.py", "--network=fcn-resnet18-cityscapes-1024x512", self.from_path, str(self.roi_box[0]), str(self.roi_box[1])]
-        command = ["python", "./test/file_down_test.py", self.from_path, str(self.roi_box[0]), str(self.roi_box[1]), str(self.roi_box[2])]  # 실행할 파일의 경로를 입력하세요.
+        # command = ["python", "./test/file_down_test.py", self.from_path, str(self.roi_box[0]), str(self.roi_box[1]), str(self.roi_box[2])]
         self.child_process = subprocess.Popen(command)
         print("CHILD PROCESS: {0}".format(os.getpid()))
     def click_start(self):
-        self.from_path = QFileDialog.getExistingDirectory(self, "Path to SAVE Data File", ".")
         ROI_window = ROIWindow()
         if ROI_window.exec_() == QDialog.Accepted:
             self.roi_box = ROI_window.get_coordinates()
@@ -97,6 +98,7 @@ class MyMainWindow(QWidget):
         self.btn_list[0].setEnabled(True)
         self.btn_list[1].setEnabled(False)
     def click_download(self):
+        self.from_path = QFileDialog.getExistingDirectory(self, "Path to Find Original Data File", ".")
         self.to_path = QFileDialog.getExistingDirectory(self, "Path to COPY Data File", ".")
         self.get_data_files()
         # self.data_list = os.listdir(self.from_path) ** test_edit **
