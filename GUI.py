@@ -13,9 +13,9 @@ from PyQt5.QtGui import *
 # 1920 * 1080 (1.0)
 # 1280 * 720 (0.66)
 # 960 * 540 (0.5)
-CAM_WIDTH = int(1280)   # 1920 / 1280 / 960
-CAM_HEIGHT = int(720)  # 1080 / 720 / 540
-CAM_SCALE = float(2 / 3)  # 1.0 / 3분의2 / 0.5
+CAM_WIDTH = int(1920)   # 1920 / 1280 / 960
+CAM_HEIGHT = int(1080)  # 1080 / 720 / 540
+CAM_SCALE = float(1.0)  # 1.0 / 3분의2 / 0.5
 
 # 수정할 필요 없는 상수입니다.
 ROI_WIDTH = int(1024 * CAM_SCALE)
@@ -76,7 +76,8 @@ class MyMainWindow(QWidget):
         self.move(qr.topLeft())
     def exe_script(self):
         self.status_label.setText("RECORDING . . . YOU CAN STOP with [STOP]")
-        command = ["python", "./test/file_down_test.py", self.from_path, str(self.roi_box[0]), str(self.roi_box[1])]  # 실행할 파일의 경로를 입력하세요.
+        # command = ["python3", "./test/segnet-camera_last_last.py", "--network=fcn-resnet18-cityscapes-1024x512", self.from_path, str(self.roi_box[0]), str(self.roi_box[1])]
+        command = ["python", "./test/file_down_test.py", self.from_path, str(self.roi_box[0]), str(self.roi_box[1]), str(self.roi_box[2])]  # 실행할 파일의 경로를 입력하세요.
         self.child_process = subprocess.Popen(command)
         print("CHILD PROCESS: {0}".format(os.getpid()))
     def click_start(self):
@@ -116,7 +117,8 @@ class ROIWindow(QDialog):
         # 확인 버튼입니다.
         self.ok_btn = QPushButton("OK", self)
         self.ok_btn.clicked.connect(self.click_ok)
-        self.ok_btn.setGeometry(int(CAM_WIDTH / 2) - 70, CAM_HEIGHT + 45, 200, 60)
+        # self.ok_btn.setGeometry(int(CAM_WIDTH / 2) - 70, CAM_HEIGHT + 45, 200, 60) 중앙 버튼
+        self.ok_btn.setGeometry(CAM_WIDTH - 170, CAM_HEIGHT + 45, 200, 60)
 
         self.img_label = QLabel(self)        # 실시간 카메라 영상을 띄울 공간입니다.
         self.img_label.setGeometry(30, 30, CAM_WIDTH, CAM_HEIGHT)   # 이 좌표를 기반으로 ROI의 좌표 보정이 들어갑니다.
@@ -148,6 +150,15 @@ class ROIWindow(QDialog):
         self.clk_y = int(30 + float(CAM_HEIGHT / 2) - float(ROI_HEIGHT / 2))
         self.scene.addItem(self.roi_box)
 
+        self.is_it_reversed = int(0)    # 카메라의 반전 여부를 의미하는 이진 변수입니다.
+
+        # 상단에 띄울 상하반전 버튼과 좌표 레이블입니다.
+        self.rvs_btn = QPushButton("UP-DOWN REVERSE", self)
+        self.rvs_btn.setGeometry(CAM_WIDTH - 485, CAM_HEIGHT + 45, 300, 60)
+        self.rvs_btn.clicked.connect(self.click_rvs)
+        self.coord_label = QLabel("p1(x, y) : (" + str(self.clk_x) + ", " + str(self.clk_y) + ")", self)
+        self.coord_label.setGeometry(30, CAM_HEIGHT + 45, 500, 60)
+
         self.setWindowTitle("SET ROI POSITION > >")
         self.setFixedSize(CAM_WIDTH + 60, CAM_HEIGHT + 120)
         self.set_window_center()
@@ -160,11 +171,18 @@ class ROIWindow(QDialog):
     def click_ok(self):
         self.capture.release()
         self.accept()
+    def click_rvs(self):
+        if self.is_it_reversed == 1:
+            self.is_it_reversed = 0
+        elif self.is_it_reversed == 0:
+            self.is_it_reversed = 1
     def update_frame(self):
         ret, frame = self.capture.read()  # 카메라에서 프레임을 읽습니다.
         if ret:
             # OpenCV의 BGR 이미지를 PyQt에서 표시 가능한 RGB 이미지로 변환합니다.
             frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            if self.is_it_reversed == 1:
+                frame_rgb = cv2.flip(frame_rgb, 0)
             h, w, ch = frame_rgb.shape
             bytes_per_line = ch * w
             q_img = QImage(frame_rgb.data, w, h, bytes_per_line, QImage.Format_RGB888)
@@ -172,8 +190,10 @@ class ROIWindow(QDialog):
             self.img_label.setPixmap(QPixmap.fromImage(q_img))
     def mousePressEvent(self, ev):
         if ev.button() == Qt.LeftButton:  # 좌클릭인 경우
-            if self.ok_btn.geometry().contains(ev.pos()):   # 버튼을 클릭한 경우
+            if self.ok_btn.geometry().contains(ev.pos()):   # OK 버튼을 클릭한 경우
                 self.ok_btn.click()
+            elif self.rvs_btn.geometry().contains(ev.pos()):   # 반전 버튼을 클릭한 경우
+                self.rvs_btn.click()
             else:   # 버튼이 아닌 영역을 클릭한 경우
                 self.scene.removeItem(self.roi_box)
                 self.clk_x = ev.pos().x()
@@ -184,9 +204,10 @@ class ROIWindow(QDialog):
                 self.roi_box.setPen(QPen(Qt.green, 10, Qt.SolidLine))
                 self.scene.addItem(self.roi_box)
                 self.update()
+                self.coord_label.setText("p1(x, y) : (" + str(self.clk_x - 30) + ", " + str(self.clk_y - 30) + ")")
                 super().mousePressEvent(ev)
     def get_coordinates(self):
-        return [self.clk_x - 30, self.clk_y - 30]
+        return [self.clk_x - 30, self.clk_y - 30, self.is_it_reversed]
 
 class DownloadWindow(QDialog):
     def __init__(self, from_path: str, data_list: list, to_path: str):
