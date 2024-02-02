@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 import os
 import sys
+import shutil as su
 import subprocess
-import signal
 import cv2
 from PyQt5.QtWidgets import *
 from PyQt5.QtCore import Qt, QRectF, QTimer
@@ -17,7 +17,11 @@ CAM_WIDTH = int(1280)   # 1920 / 1280 / 960
 CAM_HEIGHT = int(720)  # 1080 / 720 / 540
 CAM_SCALE = float(2 / 3)  # 1.0 / 3분의2 / 0.5
 
-# 수정할 필요 없는 상수입니다.
+# Excel/탐지 프레임(JPG) 데이터 파일들이 저장되어있는 경로입니다. 선택창 없이 코드 수정으로 변경합니다.
+# 끝은 반드시 디렉토리여야 하며, 맨끝에 슬래시 붙이지 않습니다. 사용할 때 주의하시길 바랍니다.
+FROM_PATH = "./Result"
+
+# 수정할 필요없이 자동으로 정의되는 상수입니다.
 ROI_WIDTH = int(1024 * CAM_SCALE)
 ROI_HEIGHT = int(512 * CAM_SCALE)
 ROI_SCALE = float(CAM_SCALE ** -1)
@@ -30,8 +34,7 @@ class MyMainWindow(QWidget):
         # 스크립트 파일에 매개변수(parameter)로 들어갈 변수 리스트입니다.
         self.script_param = []
 
-        self.from_path = "."    # 데이터 파일이 저장되어있는 경로입니다. 파일 선택기로 선택한 디렉토리여야 하며, 끝에 슬래시가 붙지 않습니다. 사용할 때 주의하시길 바랍니다.
-        self.to_path = ".."     # 데이터 파일을 복사할 타겟 경로입니다. from_path와 마찬가지입니다.
+        self.to_path = ".."         # 데이터 파일을 복사/이동할 USB의 경로입니다. 파일 선택창에서 선택하며, Excel 파일과 탐지 프레임(JPG) 디렉토리가 해당 경로로 옮겨집니다.
         self.data_list = []
 
         self.btn_list = [QPushButton("START"), QPushButton("STOP"), QPushButton("DOWNLOAD")]
@@ -78,8 +81,6 @@ class MyMainWindow(QWidget):
         self.status_label.setText("SCRIPT RUNNING . . . YOU CAN STOP with [STOP] to SAVE DATA")
         # 실행할 파일의 경로를 입력하세요.
         command = ["python3}, }./test/segnet-camera_last_last.py", "--network=fcn-resnet18-cityscapes-1024x512", f"--x_coord={str(self.roi_box[0])}", f"--y_coord={str(self.roi_box[1])}", f"--reversed={str(self.roi_box[2])}"]
-        # command = ["python3", "./test/segnet-camera_last_last.py", "--network=fcn-resnet18-cityscapes-1024x512", self.from_path, str(self.roi_box[0]), str(self.roi_box[1])]
-        # command = ["python", "./test/file_down_test.py", self.from_path, str(self.roi_box[0]), str(self.roi_box[1]), str(self.roi_box[2])]
         self.child_process = subprocess.Popen(command)
         print("CHILD PROCESS: {0}".format(os.getpid()))
     def click_start(self):
@@ -98,16 +99,14 @@ class MyMainWindow(QWidget):
         self.btn_list[0].setEnabled(True)
         self.btn_list[1].setEnabled(False)
     def click_download(self):
-        self.from_path = QFileDialog.getExistingDirectory(self, "Path to Find Original Data File", ".")
-        self.to_path = QFileDialog.getExistingDirectory(self, "Path to COPY Data File", ".")
+        self.to_path = QFileDialog.getExistingDirectory(self, "USB-Path to COPY(MOVE) Data File", ".")
         self.get_data_files()
-        # self.data_list = os.listdir(self.from_path) ** test_edit **
-        download_window = DownloadWindow(self.from_path, self.data_list, self.to_path)
+        download_window = DownloadWindow(self.data_list, self.to_path)
         if download_window.exec_() == QDialog.Accepted:
-            download_window.copy_files()
+            pass
     def get_data_files(self):
         self.data_list = []
-        for file in os.listdir(self.from_path):
+        for file in os.listdir(FROM_PATH + "/Excel"):
             if file.endswith(".xls") or file.endswith(".xlsx"):
                 self.data_list.append(file)
 
@@ -212,10 +211,8 @@ class ROIWindow(QDialog):
         return [self.clk_x - 30, self.clk_y - 30, self.is_it_reversed]
 
 class DownloadWindow(QDialog):
-    def __init__(self, from_path: str, data_list: list, to_path: str):
+    def __init__(self, data_list: list, to_path: str):
         super().__init__()
-        self.from_path = from_path
-        print(from_path)
         self.data_list = data_list
         self.to_path = to_path
         print(to_path)
@@ -231,21 +228,35 @@ class DownloadWindow(QDialog):
 
         self.select_all_btn = QPushButton("Select All", self)
         self.select_all_btn.clicked.connect(self.select_all)
+        self.refresh_btn = QPushButton("REFRESH", self)
+        self.refresh_btn.clicked.connect(self.refresh_list)
+        self.tool_layout = QHBoxLayout()
+        self.tool_layout.addWidget(self.select_all_btn)
+        self.tool_layout.addWidget(self.refresh_btn)
 
         self.copy_btn = QPushButton("COPY", self)
         self.copy_btn.clicked.connect(self.click_copy)
+        self.move_btn = QPushButton("MOVE", self)
+        self.move_btn.clicked.connect(self.click_move)
+        self.finish_btn = QPushButton("FINISH", self)
+        self.finish_btn.clicked.connect(self.click_finish)
+
+        self.btn_layout = QHBoxLayout()
+        self.btn_layout.addWidget(self.copy_btn)
+        self.btn_layout.addWidget(self.move_btn)
+        self.btn_layout.addWidget(self.finish_btn)
 
         self.list_view = QListView()
         self.list_view.setModel(self.data_model)
 
         main_layout = QVBoxLayout(self)
-        main_layout.addWidget(QLabel(self.from_path.split('/')[-1] + " -> " + self.to_path.split('/')[-1]))
-        main_layout.addWidget(self.select_all_btn)
+        # main_layout.addWidget(QLabel(self.from_path.split('/')[-1] + " -> " + self.to_path.split('/')[-1]))
+        main_layout.addLayout(self.tool_layout)
         main_layout.addWidget(self.list_view)
-        main_layout.addWidget(self.copy_btn)
+        main_layout.addLayout(self.btn_layout)
 
         self.setLayout(main_layout)
-        self.setWindowTitle("SELECT DATA FILES to COPY > >")
+        self.setWindowTitle("COPY or MOVE DATA FILES to USB > >")
         self.setFixedSize(1000, 800)
         self.set_window_center()
         self.setFont(QFont("Arial", 10))
@@ -256,26 +267,47 @@ class DownloadWindow(QDialog):
         qr.moveCenter(cp)
         self.move(qr.topLeft())
     def click_copy(self):
-        self.accept()
-    def select_all(self):
-        for i in range(len(self.data_list)):
-            self.data_model.item(i, 0).setCheckState(Qt.Checked)
-    def copy_files(self):
         for i in range(len(self.data_list)):
             if self.data_model.item(i, 0).checkState() == 2:
                 try:
-                    from_file = open(self.from_path + "/" + self.data_model.item(i, 0).text(), "r")
-                    to_file = open(self.to_path + "/" + self.data_model.item(i, 0).text(), "w")
-                    data = from_file.read()
-                    to_file.write(data)
-                    from_file.close()
-                    to_file.close()
+                    su.copy(os.path.join(FROM_PATH + "/Excel", self.data_model.item(i, 0).text()), os.path.join(self.to_path, self.data_model.item(i, 0).text()))
+                    su.copytree(FROM_PATH + "/full_frame_detect/" + self.data_model.item(i, 0).text().split('.')[0], self.to_path + "/" + self.data_model.item(i, 0).text().split('.')[0])
                 except FileNotFoundError:
                     print("File not found")
                 except Exception as e:
                     print("An error occurred", e)
                 except PermissionError:
                     print("Permission denied !")
+    def click_move(self):
+        for i in range(len(self.data_list)):
+            if self.data_model.item(i, 0).checkState() == 2:
+                try:
+                    su.move(os.path.join(FROM_PATH + "/Excel", self.data_model.item(i, 0).text()), os.path.join(self.to_path, self.data_model.item(i, 0).text()))
+                    su.move(FROM_PATH + "/full_frame_detect/" + self.data_model.item(i, 0).text().split('.')[0], self.to_path + "/" + self.data_model.item(i, 0).text().split('.')[0])
+                    self.refresh_list() # 파일 목록을 새로고침합니다.
+                except FileNotFoundError:
+                    print("File not found")
+                except Exception as e:
+                    print("An error occurred", e)
+                except PermissionError:
+                    print("Permission denied !")
+    def click_finish(self):
+        self.accept()
+    def select_all(self):
+        for i in range(len(self.data_list)):
+            self.data_model.item(i, 0).setCheckState(Qt.Checked)
+    def refresh_list(self):
+        self.get_data_files()
+        self.data_model.clear()
+        for file in self.data_list:
+            item = QStandardItem(file)
+            item.setCheckable(True)
+            self.data_model.appendRow(item)
+    def get_data_files(self):
+        self.data_list = []
+        for file in os.listdir(FROM_PATH + "/Excel"):
+            if file.endswith(".xls") or file.endswith(".xlsx"):
+                self.data_list.append(file)
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
