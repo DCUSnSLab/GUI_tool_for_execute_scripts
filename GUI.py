@@ -7,6 +7,7 @@ import cv2
 from PyQt5.QtWidgets import *
 from PyQt5.QtCore import Qt, QRectF, QTimer
 from PyQt5.QtGui import *
+import signal
 
 # ROI 영역 지정에 사용되는 카메라의 해상도입니다. 이 비율에 맞게 ROI 영역의 좌표가 보정됩니다.
 # 기본 해상도는 1920 * 1080 (100%)입니다. 사용하는 모니터의 비율보다 한 단계 낮게 설정해주세요.
@@ -80,8 +81,13 @@ class MyMainWindow(QWidget):
     def exe_script(self):
         self.status_label.setText("SCRIPT RUNNING . . . YOU CAN STOP with [STOP] to SAVE DATA")
         # 실행할 파일의 경로를 입력하세요.
-        command = ["python3}, }./test/segnet-camera_last_last.py", "--network=fcn-resnet18-cityscapes-1024x512", f"--x_coord={str(self.roi_box[0])}", f"--y_coord={str(self.roi_box[1])}", f"--reversed={str(self.roi_box[2])}"]
+        # command = ["python3}, }./test/segnet-camera_last_last.py", "--network=fcn-resnet18-cityscapes-1024x512", f"--x_coord={str(self.roi_box[0])}", f"--y_coord={str(self.roi_box[1])}", f"--reversed={str(self.roi_box[2])}"]
+        command = ["python3", "./test/segnet-camera_last_last.py", "--network=fcn-resnet18-cityscapes-1024x512",
+                   f"--x_coord={str(self.roi_box[0])}", f"--y_coord={str(self.roi_box[1])}",
+                   f"--reversed={str(self.roi_box[2])}"]  # 실행할 파일의 경로를 입력하세요.
         self.child_process = subprocess.Popen(command)
+        self.child_pid = self.child_process.pid
+        print("CHILD PID : {0}".format(self.child_pid))
         print("CHILD PROCESS: {0}".format(os.getpid()))
     def click_start(self):
         ROI_window = ROIWindow()
@@ -92,8 +98,12 @@ class MyMainWindow(QWidget):
         self.exe_script()
     def click_stop(self):
         # 스크립트가 돌아가는 child_process를 kill합니다.
-        # os.kill(pid, signal.SIGTERM)
-        self.child_process.terminate()
+        print(self.child_pid)
+        if self.child_pid:
+            os.kill(self.child_pid, signal.SIGTERM)
+        else:
+            print("Child process PID not available")
+        # self.child_process.terminate()
         # 각 버튼의 활성 상태를 바꿉니다.
         self.status_label.setText("EXCEL FILE SAVED ! Press [START] to start recording . . .")
         self.btn_list[0].setEnabled(True)
