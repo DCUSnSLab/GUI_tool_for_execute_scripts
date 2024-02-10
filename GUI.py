@@ -4,6 +4,8 @@ import sys
 import shutil as su
 import subprocess
 import cv2
+import time
+from PyQt5 import uic
 from PyQt5.QtWidgets import *
 from PyQt5.QtCore import Qt, QRectF, QTimer
 from PyQt5.QtGui import *
@@ -105,11 +107,11 @@ class MyMainWindow(QWidget):
         self.btn_list[4].setGeometry(1320, 20 + (WIDGET_HEIGHT + WIDGET_MARGIN) * 6 + WIDGET_HEIGHT, 480, WIDGET_HEIGHT * 2)
         self.btn_list[5].setGeometry(1320, 20 + (WIDGET_HEIGHT + WIDGET_MARGIN) * 7 + (WIDGET_HEIGHT) * 2, 480, WIDGET_HEIGHT)
 
-        # 마지막에 수정 필요 (로고 중앙 정렬)
         self.logo = QLabel(self)
         self.logo.setGeometry(int((1920 - int(1920 * 0.6)) / 2), 980 - int(350 * 0.6), int(1920 * 0.6), int(350 * 0.6))
         self.logo.setPixmap(QPixmap.fromImage(QImage("logo.png").scaled(self.logo.size())))
 
+        self.setWindowFlag(Qt.FramelessWindowHint)
         self.setWindowTitle("POTHOLE DETECTION")
         self.setFont(QFont("Arial", 11))
         self.showMaximized()
@@ -147,7 +149,13 @@ class MyMainWindow(QWidget):
         self.path_info.setText(self.to_path)
 
     def click_download(self):
-        print()
+        self.data_list = []
+        for file in os.listdir(FROM_PATH + "/Excel"):
+            if file.endswith(".xls") or file.endswith(".xlsx"):
+                self.data_list.append(file)
+        download_window = DownloadWindow(self.data_list, self.to_path)
+        if download_window.exec_() == QDialog.Accepted:
+            pass
     def click_shutdown(self):
         print()
     def update_frame(self):
@@ -186,6 +194,130 @@ class MyMainWindow(QWidget):
                 self.y_info.setText(str(self.roi_coord[1]))
                 self.update()
                 super().mousePressEvent(event)
+class DownloadWindow(QDialog):
+    def __init__(self, data_list: list, to_path: str):
+        super().__init__()
+        self.checked_num = int(0)
+        self.data_list = data_list
+        self.to_path = to_path
+        print(to_path)
+        self.init_UI()
+    def init_UI(self):
+        self.data_model = QStandardItemModel()
+        self.data_model.setColumnCount(1)
+        self.data_model.setHorizontalHeaderLabels(["Select", "File Name"])
+        for file in self.data_list:
+            item = QStandardItem(file)
+            item.setCheckable(True)
+            self.data_model.appendRow(item)
+
+        self.select_all_btn = QPushButton("Select All", self)
+        self.select_all_btn.clicked.connect(self.select_all)
+        self.refresh_btn = QPushButton("REFRESH", self)
+        self.refresh_btn.clicked.connect(self.refresh_list)
+        self.tool_layout = QHBoxLayout()
+        self.tool_layout.addWidget(self.select_all_btn)
+        self.tool_layout.addWidget(self.refresh_btn)
+
+        self.copy_btn = QPushButton("COPY", self)
+        self.copy_btn.clicked.connect(self.click_copy)
+        self.move_btn = QPushButton("MOVE", self)
+        self.move_btn.clicked.connect(self.click_move)
+        self.finish_btn = QPushButton("FINISH", self)
+        self.finish_btn.clicked.connect(self.click_finish)
+
+        self.btn_layout = QHBoxLayout()
+        self.btn_layout.addWidget(self.copy_btn)
+        self.btn_layout.addWidget(self.move_btn)
+        self.btn_layout.addWidget(self.finish_btn)
+
+        self.list_view = QListView()
+        self.list_view.setModel(self.data_model)
+
+        main_layout = QVBoxLayout(self)
+        # main_layout.addWidget(QLabel(self.from_path.split('/')[-1] + " -> " + self.to_path.split('/')[-1]))
+        main_layout.addLayout(self.tool_layout)
+        main_layout.addWidget(self.list_view)
+        main_layout.addLayout(self.btn_layout)
+
+        self.setLayout(main_layout)
+        self.setWindowTitle("COPY or MOVE DATA FILES to USB")
+        self.setFixedSize(1800, 1000)
+        self.setFont(QFont("Arial", 10))
+        self.show()
+    def set_window_center(self):
+        qr = self.frameGeometry()
+        cp = QDesktopWidget().availableGeometry().center()
+        qr.moveCenter(cp)
+        self.move(qr.topLeft())
+    def count_checks(self):
+        for i in range(len(self.data_list)):
+            if self.data_model.item(i, 0).checkState() == 2:
+                self.checked_num += 1
+    def lock_buttons(self):
+        self.copy_btn.setEnabled(False)
+        self.move_btn.setEnabled(False)
+        self.refresh_btn.setEnabled(False)
+        self.select_all_btn.setEnabled(False)
+        self.finish_btn.setEnabled(False)
+    def unlock_buttons(self):
+        self.copy_btn.setEnabled(True)
+        self.move_btn.setEnabled(True)
+        self.refresh_btn.setEnabled(True)
+        self.select_all_btn.setEnabled(True)
+        self.finish_btn.setEnabled(True)
+    def click_copy(self):
+        self.count_checks()
+        self.lock_buttons()
+        for i in range(len(self.data_list)):
+            if self.data_model.item(i, 0).checkState() == 2:
+                try:
+                    su.copy(os.path.join(FROM_PATH + "/Excel", self.data_model.item(i, 0).text()), os.path.join(self.to_path, self.data_model.item(i, 0).text()))
+                    su.copytree(FROM_PATH + "/full_frame_detect/" + self.data_model.item(i, 0).text().split('.')[0], self.to_path + "/" + self.data_model.item(i, 0).text().split('.')[0])
+                except FileNotFoundError:
+                    print("File not found")
+                except Exception as e:
+                    print("An error occurred", e)
+                except PermissionError:
+                    print("Permission denied !")
+        self.unlock_buttons()
+        QMessageBox.about(self, "Copy", "Finished!")
+    def click_move(self):
+        self.count_checks()
+        self.lock_buttons()
+        for i in range(len(self.data_list)):
+            if self.data_model.item(i, 0).checkState() == 2:
+                try:
+                    su.move(os.path.join(FROM_PATH + "/Excel", self.data_model.item(i, 0).text()), os.path.join(self.to_path, self.data_model.item(i, 0).text()))
+                    su.move(FROM_PATH + "/full_frame_detect/" + self.data_model.item(i, 0).text().split('.')[0], self.to_path + "/" + self.data_model.item(i, 0).text().split('.')[0])
+                    self.refresh_list() # 파일 목록을 새로고침합니다.
+                except FileNotFoundError:
+                    print("File not found")
+                except Exception as e:
+                    print("An error occurred", e)
+                except PermissionError:
+                    print("Permission denied !")
+        self.unlock_buttons()
+        QMessageBox.about(self, "Move", "Finished!")
+        QMessageBox.about(self, "Move", "Finished!")
+    def click_finish(self):
+        self.accept()
+    def select_all(self):
+        for i in range(len(self.data_list)):
+            self.data_model.item(i, 0).setCheckState(Qt.Checked)
+    def refresh_list(self):
+        self.get_data_files()
+        self.data_model.clear()
+        for file in self.data_list:
+            item = QStandardItem(file)
+            item.setCheckable(True)
+            self.data_model.appendRow(item)
+    def get_data_files(self):
+        self.data_list = []
+        for file in os.listdir(FROM_PATH + "/Excel"):
+            if file.endswith(".xls") or file.endswith(".xlsx"):
+                self.data_list.append(file)
+
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
