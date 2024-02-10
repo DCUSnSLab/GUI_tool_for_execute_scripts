@@ -21,7 +21,7 @@ ROI_WIDTH = int(1024 * PREVIEW_SCALE)
 ROI_HEIGHT = int(512 * PREVIEW_SCALE)
 
 WIDGET_HEIGHT = int(60)
-WIDGET_MARGIN = int(10)
+WIDGET_MARGIN = int(15)
 
 FROM_PATH = "./Result"
 
@@ -32,9 +32,14 @@ class MyMainWindow(QWidget):
         self.to_path = ".."
         self.data_list = []
 
-        self.btn_list = [QPushButton("SHUTDOWN", self), QPushButton("UP-DOWN REVERSE", self),
+        self.btn_list = [QPushButton("HORIZONTAL FLIP", self),
+                         QPushButton("START", self), QPushButton("STOP", self),
                          QPushButton("SELECT PATH", self), QPushButton("DOWNLOAD", self),
-                         QPushButton("STOP", self), QPushButton("START", self)]
+                         QPushButton("SHUTDOWN", self)]
+        self.btn_list[1].setStyleSheet("background-color: white; color: black; font-size: 20px; font-weight: bold;")
+        self.btn_list[2].setStyleSheet("background-color: red; color: black; font-size: 20px; font-weight: bold;")
+        self.btn_list[4].setStyleSheet("background-color: #686868; color: white; font-size: 20px; font-weight: bold;")
+        # self.btn_list[5].setStyleSheet("background-color: black; color: white;")
         self.label_list = [QLabel("> ROI Box Coordinates: (   \t\t, \t\t   )", self),
                            QLabel("> Path to Download Data Files to", self)]
         self.x_info = QLineEdit(" -", self)
@@ -44,12 +49,8 @@ class MyMainWindow(QWidget):
         self.init_UI()
     def init_UI(self):
 
-        self.logo = QLabel(self)
-        self.logo.setGeometry(0, 0, 1920, 270)
-        self.logo.setPixmap(QPixmap.fromImage(QImage("logo.png").scaled(self.logo.size())))
-
         self.img_label = QLabel(self)
-        self.img_label.setGeometry(20, 270, 1280, 720)
+        self.img_label.setGeometry(0, 0, 1280, 720)
         self.installEventFilter(self)
         timer = QTimer(self)
         timer.timeout.connect(self.update_frame)
@@ -68,17 +69,22 @@ class MyMainWindow(QWidget):
         self.view.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self.is_it_reversed = 0
 
-        self.btn_list[0].setGeometry(1320, 270, 480, WIDGET_HEIGHT)
-        self.btn_list[1].setGeometry(1320, 270 + (WIDGET_HEIGHT + WIDGET_MARGIN) * 1, 480, WIDGET_HEIGHT)
-        self.label_list[0].setGeometry(1320, 270 + (WIDGET_HEIGHT + WIDGET_MARGIN) * 2, 480, WIDGET_HEIGHT)
-        self.x_info.setGeometry(1320 + 180, 270 + (WIDGET_HEIGHT + WIDGET_MARGIN) * 2 + 10, 100, WIDGET_HEIGHT - 20)
-        self.y_info.setGeometry(1320 + 320, 270 + (WIDGET_HEIGHT + WIDGET_MARGIN) * 2 + 10, 100, WIDGET_HEIGHT - 20)
-        self.btn_list[2].setGeometry(1320, 270 + (WIDGET_HEIGHT + WIDGET_MARGIN) * 3, 480, WIDGET_HEIGHT)
-        self.label_list[1].setGeometry(1320, 270 + (WIDGET_HEIGHT + WIDGET_MARGIN) * 4, 480, WIDGET_HEIGHT)
-        self.path_info.setGeometry(1320, 270 + (WIDGET_HEIGHT + WIDGET_MARGIN) * 5, 480, WIDGET_HEIGHT - 20)
-        self.btn_list[3].setGeometry(1320, 270 + (WIDGET_HEIGHT + WIDGET_MARGIN) * 6, 480, WIDGET_HEIGHT * 2)
-        self.btn_list[4].setGeometry(1320, 270 + (WIDGET_HEIGHT + WIDGET_MARGIN) * 7 + WIDGET_HEIGHT, 235, WIDGET_HEIGHT * 2 + 50)
-        self.btn_list[5].setGeometry(1320 + 245, 270 + (WIDGET_HEIGHT + WIDGET_MARGIN) * 7 + WIDGET_HEIGHT, 235, WIDGET_HEIGHT * 2 + 50)
+        self.label_list[0].setGeometry(1320, 20, 480, WIDGET_HEIGHT)
+        self.x_info.setGeometry(1320 + 180, 30, 100, WIDGET_HEIGHT - 20)
+        self.y_info.setGeometry(1320 + 320, 30, 100, WIDGET_HEIGHT - 20)
+        self.btn_list[0].setGeometry(1320, 20 + (WIDGET_HEIGHT + WIDGET_MARGIN) * 1, 480, WIDGET_HEIGHT)
+        self.btn_list[1].setGeometry(1320, 20 + (WIDGET_HEIGHT + WIDGET_MARGIN) * 2, 235, WIDGET_HEIGHT * 2)
+        self.btn_list[2].setGeometry(1320 + 245, 20 + (WIDGET_HEIGHT + WIDGET_MARGIN) * 2, 235, WIDGET_HEIGHT * 2)
+        self.label_list[1].setGeometry(1320, 20 + (WIDGET_HEIGHT + WIDGET_MARGIN) * 3 + WIDGET_HEIGHT, 480, WIDGET_HEIGHT)
+        self.path_info.setGeometry(1320, 20 + (WIDGET_HEIGHT + WIDGET_MARGIN) * 4 + WIDGET_HEIGHT, 480, WIDGET_HEIGHT - 20)
+        self.btn_list[3].setGeometry(1320, 20 + (WIDGET_HEIGHT + WIDGET_MARGIN) * 5 + WIDGET_HEIGHT, 480, WIDGET_HEIGHT)
+        self.btn_list[4].setGeometry(1320, 20 + (WIDGET_HEIGHT + WIDGET_MARGIN) * 6 + WIDGET_HEIGHT, 480, WIDGET_HEIGHT * 2)
+        self.btn_list[5].setGeometry(1320, 20 + (WIDGET_HEIGHT + WIDGET_MARGIN) * 7 + (WIDGET_HEIGHT) * 2, 480, WIDGET_HEIGHT)
+
+        # 마지막에 수정 필요 (로고 중앙 정렬)
+        self.logo = QLabel(self)
+        self.logo.setGeometry(int((1920 - int(1920 * 0.6)) / 2), 980 - int(350 * 0.6), int(1920 * 0.6), int(350 * 0.6))
+        self.logo.setPixmap(QPixmap.fromImage(QImage("logo.png").scaled(self.logo.size())))
 
         self.setWindowTitle("POTHOLE DETECTION")
         self.setFont(QFont("Arial", 11))
