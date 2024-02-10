@@ -12,6 +12,7 @@ import signal
 # 모니터 해상도 1920 * 1080 (100%) 고정
 CAM_WIDTH = int(1920)
 CAM_HEIGHT = int(1080)
+CAM_SCALE = float(3 / 2)
 # 미리보기 해상도 1280 * 720 (66.6%) 고정
 PREVIEW_WIDTH = int(1280)
 PREVIEW_HEIGHT = int(720)
@@ -22,6 +23,12 @@ ROI_HEIGHT = int(512 * PREVIEW_SCALE)
 
 WIDGET_HEIGHT = int(60)
 WIDGET_MARGIN = int(15)
+FLIP = 0
+START = 1
+STOP = 2
+SELECT = 3
+DOWN = 4
+SHUTDOWN = 5
 
 FROM_PATH = "./Result"
 
@@ -31,27 +38,38 @@ class MyMainWindow(QWidget):
         self.child_process = None
         self.to_path = ".."
         self.data_list = []
+        self.is_it_reversed = 0
 
         self.btn_list = [QPushButton("HORIZONTAL FLIP", self),
                          QPushButton("START", self), QPushButton("STOP", self),
                          QPushButton("SELECT PATH", self), QPushButton("DOWNLOAD", self),
                          QPushButton("SHUTDOWN", self)]
+        self.btn_list[0].clicked.connect(self.click_flip)
+        self.btn_list[1].clicked.connect(self.click_start)
         self.btn_list[1].setStyleSheet("background-color: white; color: black; font-size: 20px; font-weight: bold;")
+        self.btn_list[2].clicked.connect(self.click_stop)
+        self.btn_list[2].setEnabled(False)  # STOP 버튼 비활성화
         self.btn_list[2].setStyleSheet("background-color: red; color: black; font-size: 20px; font-weight: bold;")
+        self.btn_list[3].clicked.connect(self.click_select)
+        self.btn_list[4].clicked.connect(self.click_download)
         self.btn_list[4].setStyleSheet("background-color: #686868; color: white; font-size: 20px; font-weight: bold;")
-        # self.btn_list[5].setStyleSheet("background-color: black; color: white;")
+        self.btn_list[5].clicked.connect(self.click_shutdown)
+
         self.label_list = [QLabel("> ROI Box Coordinates: (   \t\t, \t\t   )", self),
                            QLabel("> Path to Download Data Files to", self)]
         self.x_info = QLineEdit(" -", self)
+        self.x_info.setReadOnly(True)
         self.y_info = QLineEdit(" -", self)
-        self.path_info = QLineEdit(" -", self)
+        self.y_info.setReadOnly(True)
+        self.path_info = QLineEdit("", self)
+        self.path_info.setText(str(os.path.abspath(self.to_path)))
+        self.path_info.setReadOnly(True)
 
         self.init_UI()
     def init_UI(self):
-
         self.img_label = QLabel(self)
         self.img_label.setGeometry(0, 0, 1280, 720)
-        self.installEventFilter(self)
+        self.img_label.installEventFilter(self)
         timer = QTimer(self)
         timer.timeout.connect(self.update_frame)
         timer.start(10)
@@ -62,12 +80,18 @@ class MyMainWindow(QWidget):
         self.scene.setBackgroundBrush(Qt.transparent)  # 배경을 투명하게 설정
         self.view = QGraphicsView(self.scene, self)
         self.view.setStyleSheet("background: transparent;")  # 배경을 투명하게 설정
-        self.view.setSceneRect(0, 0, CAM_WIDTH + 60, CAM_HEIGHT + 120)
-        self.view.setGeometry(0, 0, CAM_WIDTH + 60, CAM_HEIGHT + 120)
-        self.view.setFixedSize(CAM_WIDTH + 60, CAM_HEIGHT + 120)
+        self.view.setSceneRect(0, 0, PREVIEW_WIDTH, PREVIEW_HEIGHT)
+        self.view.setGeometry(0, 0, PREVIEW_WIDTH, PREVIEW_HEIGHT)
+        self.view.setFixedSize(PREVIEW_WIDTH, PREVIEW_HEIGHT)
         self.view.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self.view.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-        self.is_it_reversed = 0
+        self.clk_x = int((PREVIEW_WIDTH - ROI_WIDTH) / 2)
+        self.clk_y = int((PREVIEW_HEIGHT - ROI_HEIGHT) / 2)
+        self.roi_box = QGraphicsRectItem(QRectF(self.clk_x, self.clk_y, ROI_WIDTH, ROI_HEIGHT))
+        self.roi_box.setBrush(QBrush(Qt.transparent))
+        self.roi_box.setPen(QPen(Qt.green, 10, Qt.SolidLine))
+        self.roi_coord = [int(self.clk_x * CAM_SCALE), int(self.clk_y * CAM_SCALE)]
+        self.scene.addItem(self.roi_box)
 
         self.label_list[0].setGeometry(1320, 20, 480, WIDGET_HEIGHT)
         self.x_info.setGeometry(1320 + 180, 30, 100, WIDGET_HEIGHT - 20)
@@ -89,18 +113,42 @@ class MyMainWindow(QWidget):
         self.setWindowTitle("POTHOLE DETECTION")
         self.setFont(QFont("Arial", 11))
         self.showMaximized()
-
-    def click_reverse(self):
-        print()
-    def click_shutdown(self):
-        print()
+    def click_flip(self):
+        if self.is_it_reversed == 1:
+            self.is_it_reversed = 0
+        elif self.is_it_reversed == 0:
+            self.is_it_reversed = 1
     def click_start(self):
         print()
+        # 좌표는 1920 * 1080 사이즈에 맞게 좌표 보정되어 self.roi_coord 리스트에 저장되므로, 따로 보정할 필요 없음.
+        # self.roi_coord[0]이 x 좌표, self.roi_coord[1]이 y 좌표임.
+        # self.is_it_reversed 변수는 정수 형태의 이진 변수로, 1이면 상하반전된 상태, 0이면 정방향 상태임.
+        # 자식 프로세스는 매개변수로 x/y좌표, 상하반전여부를 받아가야 함. 자식 프로세스에서 실행할 스크립트에 맞게 매개변수 작성할 것.
+
+        command = ["python3", ]     # 실행할 커맨드로 수정 바람.
+        self.child_process = subprocess.Popen(command)
+        self.child_pid = self.child_process.pid
+
+        self.img_label.setVisible(False)
+        self.roi_box.setVisible(False)
+        self.btn_list[START].setEnabled(False)
+        self.btn_list[STOP].setEnabled(True)
     def click_stop(self):
-        print()
+        if self.child_pid:
+            os.kill(self.child_pid, signal.SIGTERM)
+        else:
+            print("Child process PID not available")
+        self.img_label.setVisible(True)
+        self.roi_box.setVisible(True)
+        self.btn_list[START].setEnabled(True)
+        self.btn_list[STOP].setEnabled(False)
+    def click_select(self):
+        self.to_path = QFileDialog.getExistingDirectory(None, "USB-Path to COPY(MOVE) Data File", ".")
+        self.path_info.setText(self.to_path)
+
     def click_download(self):
         print()
-    def click_select(self):
+    def click_shutdown(self):
         print()
     def update_frame(self):
         ret, frame = self.capture.read()  # 카메라에서 프레임을 읽습니다.
@@ -112,13 +160,32 @@ class MyMainWindow(QWidget):
             h, w, ch = frame_rgb.shape
             bytes_per_line = ch * w
             q_img = QImage(frame_rgb.data, w, h, bytes_per_line, QImage.Format_RGB888)
-            # q_img.scaledToWidth(PREVIEW_WIDTH)
-            # q_img.scaledToHeight(PREVIEW_HEIGHT)
-            # QLabel에 이미지를 표시합니다.
-            # pixmap = QPixmap.fromImage(q_img)
-            # pixmap = pixmap.scaled(self.cam_preview.size())
-            # self.cam_preview.setPixmap(pixmap)
             self.img_label.setPixmap(QPixmap.fromImage(q_img))
+    def mousePressEvent(self, event):
+        if event.button() == Qt.LeftButton:
+            if self.img_label.geometry().contains(event.pos()):
+                if event.pos().x() > 1280 - ROI_WIDTH and event.pos().y() > 720 - ROI_HEIGHT:
+                    self.clk_x = 1280 - ROI_WIDTH
+                    self.clk_y = 720 - ROI_HEIGHT
+                elif event.pos().x() > 1280 - ROI_WIDTH and not event.pos().y() > 720 - ROI_HEIGHT:
+                    self.clk_x = 1280 - ROI_WIDTH
+                    self.clk_y = event.pos().y()
+                elif not event.pos().x() > 1280 - ROI_WIDTH and event.pos().y() > 720 - ROI_HEIGHT:
+                    self.clk_x = event.pos().x()
+                    self.clk_y = 720 - ROI_HEIGHT
+                else:
+                    self.clk_x = event.pos().x()
+                    self.clk_y = event.pos().y()
+                self.scene.removeItem(self.roi_box)
+                self.roi_box = QGraphicsRectItem(QRectF(self.clk_x, self.clk_y, ROI_WIDTH, ROI_HEIGHT))
+                self.roi_box.setBrush(QBrush(Qt.transparent))
+                self.roi_box.setPen(QPen(Qt.green, 10, Qt.SolidLine))
+                self.scene.addItem(self.roi_box)
+                self.roi_coord = [int(self.clk_x * CAM_SCALE), int(self.clk_y * CAM_SCALE)]
+                self.x_info.setText(str(self.roi_coord[0]))
+                self.y_info.setText(str(self.roi_coord[1]))
+                self.update()
+                super().mousePressEvent(event)
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
