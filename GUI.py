@@ -72,9 +72,9 @@ class MyMainWindow(QWidget):
         self.img_label = QLabel(self)
         self.img_label.setGeometry(0, 0, 1280, 720)
         self.img_label.installEventFilter(self)
-        timer = QTimer(self)
-        timer.timeout.connect(self.update_frame)
-        timer.start(10)
+        self.timer = QTimer(self)
+        self.timer.timeout.connect(self.update_frame)
+        self.timer.start(10)
         self.capture = cv2.VideoCapture(0)
         self.capture.set(cv2.CAP_PROP_FRAME_WIDTH, CAM_WIDTH)
         self.capture.set(cv2.CAP_PROP_FRAME_HEIGHT, CAM_HEIGHT)
@@ -126,8 +126,12 @@ class MyMainWindow(QWidget):
         # self.roi_coord[0]이 x 좌표, self.roi_coord[1]이 y 좌표임.
         # self.is_it_reversed 변수는 정수 형태의 이진 변수로, 1이면 상하반전된 상태, 0이면 정방향 상태임.
         # 자식 프로세스는 매개변수로 x/y좌표, 상하반전여부를 받아가야 함. 자식 프로세스에서 실행할 스크립트에 맞게 매개변수 작성할 것.
-
-        command = ["python3", ]     # 실행할 커맨드로 수정 바람.
+        self.timer.stop()
+        self.capture.release()
+        # command = ["python3", ]     # 실행할 커맨드로 수정 바람.
+        command = ["python3", "./test/segnet-camera_last_last.py", "--network=fcn-resnet18-cityscapes-1024x512",
+                   f"--x_coord={str(self.roi_coord[0])}", f"--y_coord={str(self.roi_coord[1])}",
+                   f"--reversed={str(self.is_it_reversed)}"]  # 실행할 파일의 경로를 입력하세요.
         self.child_process = subprocess.Popen(command)
         self.child_pid = self.child_process.pid
 
@@ -317,7 +321,6 @@ class DownloadWindow(QDialog):
         for file in os.listdir(FROM_PATH + "/Excel"):
             if file.endswith(".xls") or file.endswith(".xlsx"):
                 self.data_list.append(file)
-
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
