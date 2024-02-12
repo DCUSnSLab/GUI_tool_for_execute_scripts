@@ -154,7 +154,6 @@ class MyMainWindow(QWidget):
     def click_select(self):
         self.to_path = QFileDialog.getExistingDirectory(None, "USB-Path to COPY(MOVE) Data File", ".")
         self.path_info.setText(self.to_path)
-
     def click_download(self):
         self.data_list = []
         for file in os.listdir(FROM_PATH + "/Excel"):
@@ -164,7 +163,13 @@ class MyMainWindow(QWidget):
         if download_window.exec_() == QDialog.Accepted:
             pass
     def click_shutdown(self):
-        print()
+        if self.child_pid:
+            os.kill(self.child_pid, signal.SIGTERM)
+        else:
+            print("Child process PID not available")
+        self.timer.stop()
+        self.capture.release()
+        os.system("shutdown -s -f")
     def update_frame(self):
         ret, frame = self.capture.read()  # 카메라에서 프레임을 읽습니다.
         if ret:
