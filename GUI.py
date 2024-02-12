@@ -4,8 +4,6 @@ import sys
 import shutil as su
 import subprocess
 import cv2
-import time
-from PyQt5 import uic
 from PyQt5.QtWidgets import *
 from PyQt5.QtCore import Qt, QRectF, QTimer
 from PyQt5.QtGui import *
@@ -59,12 +57,11 @@ class MyMainWindow(QWidget):
 
         self.label_list = [QLabel("> ROI Box Coordinates: (   \t\t, \t\t   )", self),
                            QLabel("> Path to Download Data Files to", self)]
-        self.x_info = QLineEdit(" -", self)
+        self.x_info = QLineEdit("", self)
         self.x_info.setReadOnly(True)
-        self.y_info = QLineEdit(" -", self)
+        self.y_info = QLineEdit("", self)
         self.y_info.setReadOnly(True)
         self.path_info = QLineEdit("", self)
-        self.path_info.setText(str(os.path.abspath(self.to_path)))
         self.path_info.setReadOnly(True)
 
         self.init_UI()
@@ -88,12 +85,16 @@ class MyMainWindow(QWidget):
         self.view.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self.view.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self.clk_x = int((PREVIEW_WIDTH - ROI_WIDTH) / 2)
-        self.clk_y = int((PREVIEW_HEIGHT - ROI_HEIGHT) / 2)
+        self.clk_y = int(PREVIEW_HEIGHT - ROI_HEIGHT)
         self.roi_box = QGraphicsRectItem(QRectF(self.clk_x, self.clk_y, ROI_WIDTH, ROI_HEIGHT))
         self.roi_box.setBrush(QBrush(Qt.transparent))
         self.roi_box.setPen(QPen(Qt.green, 10, Qt.SolidLine))
         self.roi_coord = [int(self.clk_x * CAM_SCALE), int(self.clk_y * CAM_SCALE)]
         self.scene.addItem(self.roi_box)
+
+        self.x_info.setText(str(self.clk_x))
+        self.y_info.setText(str(self.clk_y))
+        self.path_info.setText(str(os.path.abspath(self.to_path)))
 
         self.label_list[0].setGeometry(1320, 20, 480, WIDGET_HEIGHT)
         self.x_info.setGeometry(1320 + 180, 30, 100, WIDGET_HEIGHT - 20)
@@ -121,17 +122,15 @@ class MyMainWindow(QWidget):
         elif self.is_it_reversed == 0:
             self.is_it_reversed = 1
     def click_start(self):
-        print()
         # 좌표는 1920 * 1080 사이즈에 맞게 좌표 보정되어 self.roi_coord 리스트에 저장되므로, 따로 보정할 필요 없음.
         # self.roi_coord[0]이 x 좌표, self.roi_coord[1]이 y 좌표임.
         # self.is_it_reversed 변수는 정수 형태의 이진 변수로, 1이면 상하반전된 상태, 0이면 정방향 상태임.
         # 자식 프로세스는 매개변수로 x/y좌표, 상하반전여부를 받아가야 함. 자식 프로세스에서 실행할 스크립트에 맞게 매개변수 작성할 것.
         self.timer.stop()
         self.capture.release()
-        # command = ["python3", ]     # 실행할 커맨드로 수정 바람.
         command = ["python3", "./test/segnet-camera_last_last.py", "--network=fcn-resnet18-cityscapes-1024x512",
                    f"--x_coord={str(self.roi_coord[0])}", f"--y_coord={str(self.roi_coord[1])}",
-                   f"--reversed={str(self.is_it_reversed)}"]  # 실행할 파일의 경로를 입력하세요.
+                   f"--reversed={str(self.is_it_reversed)}"]
         self.child_process = subprocess.Popen(command)
         self.child_pid = self.child_process.pid
 
@@ -140,6 +139,10 @@ class MyMainWindow(QWidget):
         self.btn_list[START].setEnabled(False)
         self.btn_list[STOP].setEnabled(True)
     def click_stop(self):
+        self.timer.start(10)
+        self.capture = cv2.VideoCapture(0)
+        self.capture.set(cv2.CAP_PROP_FRAME_WIDTH, CAM_WIDTH)
+        self.capture.set(cv2.CAP_PROP_FRAME_HEIGHT, CAM_HEIGHT)
         if self.child_pid:
             os.kill(self.child_pid, signal.SIGTERM)
         else:
@@ -151,7 +154,6 @@ class MyMainWindow(QWidget):
     def click_select(self):
         self.to_path = QFileDialog.getExistingDirectory(None, "USB-Path to COPY(MOVE) Data File", ".")
         self.path_info.setText(self.to_path)
-
     def click_download(self):
         self.data_list = []
         for file in os.listdir(FROM_PATH + "/Excel"):
@@ -161,7 +163,13 @@ class MyMainWindow(QWidget):
         if download_window.exec_() == QDialog.Accepted:
             pass
     def click_shutdown(self):
-        print()
+        if self.child_pid:
+            os.kill(self.child_pid, signal.SIGTERM)
+        else:
+            print("Child process PID not available")
+        self.timer.stop()
+        self.capture.release()
+        os.system("shutdown -s -f")
     def update_frame(self):
         ret, frame = self.capture.read()  # 카메라에서 프레임을 읽습니다.
         if ret:
@@ -227,12 +235,15 @@ class DownloadWindow(QDialog):
         self.copy_btn.clicked.connect(self.click_copy)
         self.move_btn = QPushButton("MOVE", self)
         self.move_btn.clicked.connect(self.click_move)
+        self.delete_btn = QPushButton("DELETE", self)
+        self.delete_btn.clicked.connect(self.click_delete)
         self.finish_btn = QPushButton("FINISH", self)
         self.finish_btn.clicked.connect(self.click_finish)
 
         self.btn_layout = QHBoxLayout()
         self.btn_layout.addWidget(self.copy_btn)
         self.btn_layout.addWidget(self.move_btn)
+        self.btn_layout.addWidget(self.delete_btn)
         self.btn_layout.addWidget(self.finish_btn)
 
         self.list_view = QListView()
@@ -279,10 +290,13 @@ class DownloadWindow(QDialog):
                     su.copy(os.path.join(FROM_PATH + "/Excel", self.data_model.item(i, 0).text()), os.path.join(self.to_path, self.data_model.item(i, 0).text()))
                     su.copytree(FROM_PATH + "/full_frame_detect/" + self.data_model.item(i, 0).text().split('.')[0], self.to_path + "/" + self.data_model.item(i, 0).text().split('.')[0])
                 except FileNotFoundError:
+                    QMessageBox.about(self, "Error !", "File {0} not found.\nProceed to next task without copying this file.".format(self.data_model.item(i, 0).text()))
                     print("File not found")
                 except Exception as e:
+                    QMessageBox.about(self, "Error !", "An error occurred while copying file {0}.\nProceed to next task without copying this file.".format(self.data_model.item(i, 0).text()))
                     print("An error occurred", e)
                 except PermissionError:
+                    QMessageBox.about(self, "Error !", "Permission denied!\nProceed to next task without copying this file.")
                     print("Permission denied !")
         self.unlock_buttons()
         QMessageBox.about(self, "Copy", "Finished!")
@@ -294,16 +308,38 @@ class DownloadWindow(QDialog):
                 try:
                     su.move(os.path.join(FROM_PATH + "/Excel", self.data_model.item(i, 0).text()), os.path.join(self.to_path, self.data_model.item(i, 0).text()))
                     su.move(FROM_PATH + "/full_frame_detect/" + self.data_model.item(i, 0).text().split('.')[0], self.to_path + "/" + self.data_model.item(i, 0).text().split('.')[0])
-                    self.refresh_list() # 파일 목록을 새로고침합니다.
                 except FileNotFoundError:
+                    QMessageBox.about(self, "Error !", "File {0} not found.\nProceed to next task without moving this file.".format(self.data_model.item(i, 0).text()))
                     print("File not found")
                 except Exception as e:
+                    QMessageBox.about(self, "Error !", "An error occurred while moving file {0}.\nProceed to next task without moving this file.".format(self.data_model.item(i, 0).text()))
                     print("An error occurred", e)
                 except PermissionError:
+                    QMessageBox.about(self, "Error !", "Permission denied!\nProceed to next task without moving this file.")
                     print("Permission denied !")
         self.unlock_buttons()
+        self.refresh_list() # 파일 목록을 새로고침합니다.
         QMessageBox.about(self, "Move", "Finished!")
-        QMessageBox.about(self, "Move", "Finished!")
+    def click_delete(self):
+        self.count_checks()
+        self.lock_buttons()
+        for i in range(len(self.data_list)):
+            if self.data_model.item(i, 0).checkState() == 2:
+                try:
+                    os.remove(os.path.join(FROM_PATH + "/Excel", self.data_model.item(i, 0).text()))
+                    su.rmtree(FROM_PATH + "/full_frame_detect/" + self.data_model.item(i, 0).text().split('.')[0])
+                except FileNotFoundError:
+                    QMessageBox.about(self, "Error !", "File {0} not found.\nProceed to next task without deleting this file.".format(self.data_model.item(i, 0).text()))
+                    print("File not found")
+                except Exception as e:
+                    QMessageBox.about(self, "Error !", "An error occurred while deleting file {0}.\nProceed to next task without deleting this file.".format(self.data_model.item(i, 0).text()))
+                    print("An error occurred", e)
+                except PermissionError:
+                    QMessageBox.about(self, "Error !", "Permission denied!\nProceed to next task without deleting this file.")
+                    print("Permission denied !")
+        self.unlock_buttons()
+        self.refresh_list()  # 파일 목록을 새로고침합니다.
+        QMessageBox.about(self, "Delete", "Finished!")
     def click_finish(self):
         self.accept()
     def select_all(self):
