@@ -67,5 +67,38 @@ $ python3 GUI.py
     * 사용자가 따로 새로고침하지 않아도 삭제가 완료되면 리스트가 자동으로 업데이트됨.
 * `FINISH` 버튼
     * 현재 창을 안전하게 종료한 후 메인창으로 돌아감.
- 
+---
+
+### 기능 별 시연 영상
+
+* 메인창 - `HORIZONTAL FLIP`<br/><br/>
+![flip](https://github.com/DCUSnSLab/GUI_tool_for_execute_scripts/assets/102202662/f3ff2691-4813-4d9c-91ef-ae0fd5ee6182)
+<br/>
+
+* 메인창 - `SELECT PATH`<br/><br/>
+![select](https://github.com/DCUSnSLab/GUI_tool_for_execute_scripts/assets/102202662/529b7166-067c-42e4-8e57-fccefeba389a)
+<br/>
+
+* 메인창 - `START` & `STOP`<br/><br/>
+![start-and-stop](https://github.com/DCUSnSLab/GUI_tool_for_execute_scripts/assets/102202662/c28b585d-86b9-4a8e-9954-2f45784502b9)
+<br/>
+
+* 메인창 - `SHUTDOWN`<br/><br/>
+![shutdown](https://github.com/DCUSnSLab/GUI_tool_for_execute_scripts/assets/102202662/6d34c493-7cbe-44ea-9597-d78a6a9b77dd)
+<br/>
+
+* 파일관리창 - `DELETE`<br/><br/>
+![download_delete](https://github.com/DCUSnSLab/GUI_tool_for_execute_scripts/assets/102202662/961a69a1-f68b-457e-91f3-189a7bbe43bc)
+<br/>
+
+* 파일관리창 - `COPY`<br/><br/>
+![download_copy](https://github.com/DCUSnSLab/GUI_tool_for_execute_scripts/assets/102202662/47968d58-0d68-4ef5-8308-991c78b9a953)
+<br/>
+
+* 파일관리창 - `MOVE`<br/><br/>
+![download_move](https://github.com/DCUSnSLab/GUI_tool_for_execute_scripts/assets/102202662/b0d7cb6b-01f6-47d4-aca4-4cbb4fc553da)
+<br/>
+
+* 파일관리창 - 에러 핸들링<br/><br/>
+![download_error](https://github.com/DCUSnSLab/GUI_tool_for_execute_scripts/assets/102202662/43dadc1f-f120-4fb2-8f81-3d808ebb8c8c)
 
