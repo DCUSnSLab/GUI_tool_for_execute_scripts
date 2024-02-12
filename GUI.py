@@ -290,10 +290,13 @@ class DownloadWindow(QDialog):
                     su.copy(os.path.join(FROM_PATH + "/Excel", self.data_model.item(i, 0).text()), os.path.join(self.to_path, self.data_model.item(i, 0).text()))
                     su.copytree(FROM_PATH + "/full_frame_detect/" + self.data_model.item(i, 0).text().split('.')[0], self.to_path + "/" + self.data_model.item(i, 0).text().split('.')[0])
                 except FileNotFoundError:
+                    QMessageBox.about(self, "Error !", "File {0} not found.\nProceed to next task without copying this file.".format(self.data_model.item(i, 0).text()))
                     print("File not found")
                 except Exception as e:
+                    QMessageBox.about(self, "Error !", "An error occurred while copying file {0}.\nProceed to next task without copying this file.".format(self.data_model.item(i, 0).text()))
                     print("An error occurred", e)
                 except PermissionError:
+                    QMessageBox.about(self, "Error !", "Permission denied!\nProceed to next task without copying this file.")
                     print("Permission denied !")
         self.unlock_buttons()
         QMessageBox.about(self, "Copy", "Finished!")
@@ -306,10 +309,13 @@ class DownloadWindow(QDialog):
                     su.move(os.path.join(FROM_PATH + "/Excel", self.data_model.item(i, 0).text()), os.path.join(self.to_path, self.data_model.item(i, 0).text()))
                     su.move(FROM_PATH + "/full_frame_detect/" + self.data_model.item(i, 0).text().split('.')[0], self.to_path + "/" + self.data_model.item(i, 0).text().split('.')[0])
                 except FileNotFoundError:
+                    QMessageBox.about(self, "Error !", "File {0} not found.\nProceed to next task without moving this file.".format(self.data_model.item(i, 0).text()))
                     print("File not found")
                 except Exception as e:
+                    QMessageBox.about(self, "Error !", "An error occurred while moving file {0}.\nProceed to next task without moving this file.".format(self.data_model.item(i, 0).text()))
                     print("An error occurred", e)
                 except PermissionError:
+                    QMessageBox.about(self, "Error !", "Permission denied!\nProceed to next task without moving this file.")
                     print("Permission denied !")
         self.unlock_buttons()
         self.refresh_list() # 파일 목록을 새로고침합니다.
@@ -323,10 +329,13 @@ class DownloadWindow(QDialog):
                     os.remove(os.path.join(FROM_PATH + "/Excel", self.data_model.item(i, 0).text()))
                     su.rmtree(FROM_PATH + "/full_frame_detect/" + self.data_model.item(i, 0).text().split('.')[0])
                 except FileNotFoundError:
+                    QMessageBox.about(self, "Error !", "File {0} not found.\nProceed to next task without deleting this file.".format(self.data_model.item(i, 0).text()))
                     print("File not found")
                 except Exception as e:
+                    QMessageBox.about(self, "Error !", "An error occurred while deleting file {0}.\nProceed to next task without deleting this file.".format(self.data_model.item(i, 0).text()))
                     print("An error occurred", e)
                 except PermissionError:
+                    QMessageBox.about(self, "Error !", "Permission denied!\nProceed to next task without deleting this file.")
                     print("Permission denied !")
         self.unlock_buttons()
         self.refresh_list()  # 파일 목록을 새로고침합니다.
