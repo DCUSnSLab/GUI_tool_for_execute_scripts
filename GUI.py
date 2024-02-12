@@ -36,6 +36,7 @@ class MyMainWindow(QWidget):
     def __init__(self):
         super().__init__()
         self.child_process = None
+        self.child_pid = None
         self.to_path = ".."
         self.data_list = []
         self.is_it_reversed = 0
@@ -152,24 +153,38 @@ class MyMainWindow(QWidget):
         self.btn_list[START].setEnabled(True)
         self.btn_list[STOP].setEnabled(False)
     def click_select(self):
+        self.timer.stop()
+        self.capture.release()
         self.to_path = QFileDialog.getExistingDirectory(None, "USB-Path to COPY(MOVE) Data File", ".")
         self.path_info.setText(self.to_path)
+        self.timer.start(10)
+        self.capture = cv2.VideoCapture(0)
+        self.capture.set(cv2.CAP_PROP_FRAME_WIDTH, CAM_WIDTH)
+        self.capture.set(cv2.CAP_PROP_FRAME_HEIGHT, CAM_HEIGHT)
     def click_download(self):
+        self.timer.stop()
+        self.capture.release()
         self.data_list = []
         for file in os.listdir(FROM_PATH + "/Excel"):
             if file.endswith(".xls") or file.endswith(".xlsx"):
                 self.data_list.append(file)
         download_window = DownloadWindow(self.data_list, self.to_path)
         if download_window.exec_() == QDialog.Accepted:
-            pass
+            self.timer.start(10)
+            self.capture = cv2.VideoCapture(0)
+            self.capture.set(cv2.CAP_PROP_FRAME_WIDTH, CAM_WIDTH)
+            self.capture.set(cv2.CAP_PROP_FRAME_HEIGHT, CAM_HEIGHT)
     def click_shutdown(self):
         if self.child_pid:
             os.kill(self.child_pid, signal.SIGTERM)
+            QMessageBox.about(self, "Notice", "Script is killed.\nExit GUI program and shut down the computer.")
         else:
             print("Child process PID not available")
+            QMessageBox.about(self, "Notice", "No script to kill.\nExit GUI program and shut down the computer.")
         self.timer.stop()
         self.capture.release()
-        os.system("shutdown -s -f")
+        # tmp = input("SHUTDOWN?")
+        os.system("shutdown -h now")
     def update_frame(self):
         ret, frame = self.capture.read()  # 카메라에서 프레임을 읽습니다.
         if ret:
