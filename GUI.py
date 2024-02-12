@@ -174,6 +174,11 @@ class MyMainWindow(QWidget):
             self.capture = cv2.VideoCapture(0)
             self.capture.set(cv2.CAP_PROP_FRAME_WIDTH, CAM_WIDTH)
             self.capture.set(cv2.CAP_PROP_FRAME_HEIGHT, CAM_HEIGHT)
+        else:
+            self.timer.start(10)
+            self.capture = cv2.VideoCapture(0)
+            self.capture.set(cv2.CAP_PROP_FRAME_WIDTH, CAM_WIDTH)
+            self.capture.set(cv2.CAP_PROP_FRAME_HEIGHT, CAM_HEIGHT)
     def click_shutdown(self):
         if self.child_pid:
             os.kill(self.child_pid, signal.SIGTERM)
@@ -303,7 +308,6 @@ class DownloadWindow(QDialog):
             if self.data_model.item(i, 0).checkState() == 2:
                 try:
                     su.copy(os.path.join(FROM_PATH + "/Excel", self.data_model.item(i, 0).text()), os.path.join(self.to_path, self.data_model.item(i, 0).text()))
-                    su.copytree(FROM_PATH + "/full_frame_detect/" + self.data_model.item(i, 0).text().split('.')[0], self.to_path + "/" + self.data_model.item(i, 0).text().split('.')[0])
                 except FileNotFoundError:
                     QMessageBox.about(self, "Error !", "File {0} not found.\nProceed to next task without copying this file.".format(self.data_model.item(i, 0).text()))
                     print("File not found")
@@ -312,6 +316,17 @@ class DownloadWindow(QDialog):
                     print("An error occurred", e)
                 except PermissionError:
                     QMessageBox.about(self, "Error !", "Permission denied!\nProceed to next task without copying this file.")
+                    print("Permission denied !")
+                try:
+                    su.copytree(FROM_PATH + "/full_frame_detect/" + self.data_model.item(i, 0).text().split('.')[0], self.to_path + "/" + self.data_model.item(i, 0).text().split('.')[0])
+                except FileNotFoundError:
+                    QMessageBox.about(self, "Error !", "Directory {0} not found.\nProceed to next task without copying directory connected this file.".format(self.data_model.item(i, 0).text().split('.')[0]))
+                    print("Directory not found")
+                except Exception as e:
+                    QMessageBox.about(self, "Error !", "An error occurred while copying directory {0}.\nProceed to next task without copying this directory.".format(self.data_model.item(i, 0).text().split('.')[0]))
+                    print("An error occurred", e)
+                except PermissionError:
+                    QMessageBox.about(self, "Error !", "Permission denied!\nProceed to next task without copying directory connected this file.")
                     print("Permission denied !")
         self.unlock_buttons()
         QMessageBox.about(self, "Copy", "Finished!")
@@ -322,7 +337,6 @@ class DownloadWindow(QDialog):
             if self.data_model.item(i, 0).checkState() == 2:
                 try:
                     su.move(os.path.join(FROM_PATH + "/Excel", self.data_model.item(i, 0).text()), os.path.join(self.to_path, self.data_model.item(i, 0).text()))
-                    su.move(FROM_PATH + "/full_frame_detect/" + self.data_model.item(i, 0).text().split('.')[0], self.to_path + "/" + self.data_model.item(i, 0).text().split('.')[0])
                 except FileNotFoundError:
                     QMessageBox.about(self, "Error !", "File {0} not found.\nProceed to next task without moving this file.".format(self.data_model.item(i, 0).text()))
                     print("File not found")
@@ -331,6 +345,17 @@ class DownloadWindow(QDialog):
                     print("An error occurred", e)
                 except PermissionError:
                     QMessageBox.about(self, "Error !", "Permission denied!\nProceed to next task without moving this file.")
+                    print("Permission denied !")
+                try:
+                    su.move(FROM_PATH + "/full_frame_detect/" + self.data_model.item(i, 0).text().split('.')[0], self.to_path + "/" + self.data_model.item(i, 0).text().split('.')[0])
+                except FileNotFoundError:
+                    QMessageBox.about(self, "Error !", "Directory {0} not found.\nProceed to next task without moving directory connected this file.".format(self.data_model.item(i, 0).text().split('.')[0]))
+                    print("Directory not found")
+                except Exception as e:
+                    QMessageBox.about(self, "Error !", "An error occurred while moving directory {0}.\nProceed to next task without moving this directory.".format(self.data_model.item(i, 0).text().split('.')[0]))
+                    print("An error occurred", e)
+                except PermissionError:
+                    QMessageBox.about(self, "Error !", "Permission denied!\nProceed to next task without moving directory connected this file.")
                     print("Permission denied !")
         self.unlock_buttons()
         self.refresh_list() # 파일 목록을 새로고침합니다.
@@ -342,7 +367,6 @@ class DownloadWindow(QDialog):
             if self.data_model.item(i, 0).checkState() == 2:
                 try:
                     os.remove(os.path.join(FROM_PATH + "/Excel", self.data_model.item(i, 0).text()))
-                    su.rmtree(FROM_PATH + "/full_frame_detect/" + self.data_model.item(i, 0).text().split('.')[0])
                 except FileNotFoundError:
                     QMessageBox.about(self, "Error !", "File {0} not found.\nProceed to next task without deleting this file.".format(self.data_model.item(i, 0).text()))
                     print("File not found")
@@ -351,6 +375,17 @@ class DownloadWindow(QDialog):
                     print("An error occurred", e)
                 except PermissionError:
                     QMessageBox.about(self, "Error !", "Permission denied!\nProceed to next task without deleting this file.")
+                    print("Permission denied !")
+                try:
+                    su.rmtree(FROM_PATH + "/full_frame_detect/" + self.data_model.item(i, 0).text().split('.')[0])
+                except FileNotFoundError:
+                    QMessageBox.about(self, "Error !", "Directory {0} not found.\nProceed to next task without deleting directory connected this file.".format(self.data_model.item(i, 0).text().split('.')[0]))
+                    print("Directory not found")
+                except Exception as e:
+                    QMessageBox.about(self, "Error !", "An error occurred while deleting directory {0}.\nProceed to next task without deleting this directory.".format(self.data_model.item(i, 0).text().split('.')[0]))
+                    print("An error occurred", e)
+                except PermissionError:
+                    QMessageBox.about(self, "Error !", "Permission denied!\nProceed to next task without deleting directory connected this file.")
                     print("Permission denied !")
         self.unlock_buttons()
         self.refresh_list()  # 파일 목록을 새로고침합니다.
