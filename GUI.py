@@ -141,13 +141,13 @@ class MyMainWindow(QWidget):
         # 자식 프로세스는 매개변수로 x/y좌표, 상하반전여부를 받아가야 함. 자식 프로세스에서 실행할 스크립트에 맞게 매개변수 작성할 것.
         #self.timer.stop()
         #self.capture.release()
-        command = ["python3", "./test/segnet-camera_last_last.py", "--network=fcn-resnet18-cityscapes-1024x512",
+        command = ["python3", "/home/snslab/Pothole/jetson-inference/build/aarch64/bin/Creat_GUI/GUI_tool_for_execute_scripts/test/segnet-camera_last_last_soobintest.py", "--network=fcn-resnet18-cityscapes-1024x512",
                    f"--x_coord={str(self.roi_coord[0])}", f"--y_coord={str(self.roi_coord[1])}",
                    f"--reversed={str(self.is_it_reversed)}"]
         self.child_process = subprocess.Popen(command)
         self.child_pid = self.child_process.pid
 
-        self.img_label.setVisible(False)
+        self.img_label.setVisible(True)
         self.roi_box.setVisible(False)
         self.btn_list[START].setEnabled(False)
         self.btn_list[STOP].setEnabled(True)

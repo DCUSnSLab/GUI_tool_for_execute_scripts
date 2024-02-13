@@ -1,5 +1,5 @@
 import sys
-
+import time
 from PyQt5.QtCore import QThread, pyqtSignal
 import cv2
 from time import sleep
@@ -47,13 +47,14 @@ class VideoGrabber(QThread):
 
     def releaseGrab(self):
         self.isGrab = False
-        if self.useCam is True and self.isGrab is True:
+        if self.useCam is True and self.isGrab is False:
             self.setCamUsage(False)
 
 
     def setCamUsage(self, isbool):
         if isbool is True:
             print('set CAM')
+            time.sleep(3)
             self.cap = cv2.VideoCapture(0)
             self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, self.c_width)
             self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, self.c_height)

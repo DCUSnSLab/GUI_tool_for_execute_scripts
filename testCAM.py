@@ -14,6 +14,7 @@ with NumpySocket() as s:
         if ret is True:
             try:
                 s.sendall(frame_resize)
+                #print()
             except Exception:
                 break
         else:

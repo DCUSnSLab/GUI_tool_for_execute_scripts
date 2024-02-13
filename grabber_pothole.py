@@ -27,6 +27,7 @@ class GrabberServer(VideoGrabber):
                             break
 
                         if self.isGrab is True:
+                            print('server - send data')
                             self.grabber_signal.emit(frame)
                     #logger.info(f"disconnected: {addr}")
                     print('disconnected: ',addr)
