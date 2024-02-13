@@ -4,10 +4,14 @@ import sys
 import shutil as su
 import subprocess
 import cv2
+import numpy as np
 from PyQt5.QtWidgets import *
-from PyQt5.QtCore import Qt, QRectF, QTimer
+from PyQt5.QtCore import Qt, QRectF, QTimer, pyqtSlot
 from PyQt5.QtGui import *
 import signal
+
+from grabber_basic import GrabberBasic
+from videoadapter import VideoAdapter
 
 # 모니터 해상도 1920 * 1080 (100%) 고정
 CAM_WIDTH = int(1920)
@@ -41,6 +45,16 @@ class MyMainWindow(QWidget):
         self.data_list = []
         self.is_it_reversed = 0
 
+        self.init_UI()
+        self.videoAdapt = VideoAdapter(CAM_WIDTH, CAM_HEIGHT)
+        self.videoAdapt.changed_pixmap_sig.connect(self.update_frame)
+
+        self.videoAdapt.addVideoGrabber(GrabberBasic("basic"))
+
+        self.videoAdapt.start()
+
+
+    def init_UI(self):
         self.btn_list = [QPushButton("HORIZONTAL FLIP", self),
                          QPushButton("START", self), QPushButton("STOP", self),
                          QPushButton("SELECT PATH", self), QPushButton("DOWNLOAD", self),
@@ -58,24 +72,16 @@ class MyMainWindow(QWidget):
 
         self.label_list = [QLabel("> ROI Box Coordinates: (   \t\t, \t\t   )", self),
                            QLabel("> Path to Download Data Files to", self)]
+
         self.x_info = QLineEdit("", self)
         self.x_info.setReadOnly(True)
         self.y_info = QLineEdit("", self)
         self.y_info.setReadOnly(True)
         self.path_info = QLineEdit("", self)
         self.path_info.setReadOnly(True)
-
-        self.init_UI()
-    def init_UI(self):
         self.img_label = QLabel(self)
         self.img_label.setGeometry(0, 0, 1280, 720)
         self.img_label.installEventFilter(self)
-        self.timer = QTimer(self)
-        self.timer.timeout.connect(self.update_frame)
-        self.timer.start(10)
-        self.capture = cv2.VideoCapture(0)
-        self.capture.set(cv2.CAP_PROP_FRAME_WIDTH, CAM_WIDTH)
-        self.capture.set(cv2.CAP_PROP_FRAME_HEIGHT, CAM_HEIGHT)
         self.scene = QGraphicsScene(self)
         self.scene.setBackgroundBrush(Qt.transparent)  # 배경을 투명하게 설정
         self.view = QGraphicsView(self.scene, self)
@@ -117,18 +123,20 @@ class MyMainWindow(QWidget):
         self.setWindowTitle("POTHOLE DETECTION")
         self.setFont(QFont("Arial", 11))
         self.showMaximized()
+
     def click_flip(self):
         if self.is_it_reversed == 1:
             self.is_it_reversed = 0
         elif self.is_it_reversed == 0:
             self.is_it_reversed = 1
+
     def click_start(self):
         # 좌표는 1920 * 1080 사이즈에 맞게 좌표 보정되어 self.roi_coord 리스트에 저장되므로, 따로 보정할 필요 없음.
         # self.roi_coord[0]이 x 좌표, self.roi_coord[1]이 y 좌표임.
         # self.is_it_reversed 변수는 정수 형태의 이진 변수로, 1이면 상하반전된 상태, 0이면 정방향 상태임.
         # 자식 프로세스는 매개변수로 x/y좌표, 상하반전여부를 받아가야 함. 자식 프로세스에서 실행할 스크립트에 맞게 매개변수 작성할 것.
-        self.timer.stop()
-        self.capture.release()
+        #self.timer.stop()
+        #self.capture.release()
         command = ["python3", "./test/segnet-camera_last_last.py", "--network=fcn-resnet18-cityscapes-1024x512",
                    f"--x_coord={str(self.roi_coord[0])}", f"--y_coord={str(self.roi_coord[1])}",
                    f"--reversed={str(self.is_it_reversed)}"]
@@ -139,11 +147,12 @@ class MyMainWindow(QWidget):
         self.roi_box.setVisible(False)
         self.btn_list[START].setEnabled(False)
         self.btn_list[STOP].setEnabled(True)
+
     def click_stop(self):
-        self.timer.start(10)
-        self.capture = cv2.VideoCapture(0)
-        self.capture.set(cv2.CAP_PROP_FRAME_WIDTH, CAM_WIDTH)
-        self.capture.set(cv2.CAP_PROP_FRAME_HEIGHT, CAM_HEIGHT)
+        # self.timer.start(10)
+        # self.capture = cv2.VideoCapture(0)
+        # self.capture.set(cv2.CAP_PROP_FRAME_WIDTH, CAM_WIDTH)
+        # self.capture.set(cv2.CAP_PROP_FRAME_HEIGHT, CAM_HEIGHT)
         if self.child_pid:
             os.kill(self.child_pid, signal.SIGTERM)
         else:
@@ -153,32 +162,28 @@ class MyMainWindow(QWidget):
         self.btn_list[START].setEnabled(True)
         self.btn_list[STOP].setEnabled(False)
     def click_select(self):
-        self.timer.stop()
-        self.capture.release()
+        #self.timer.stop()
+        #self.capture.release()
         self.to_path = QFileDialog.getExistingDirectory(None, "USB-Path to COPY(MOVE) Data File", ".")
         self.path_info.setText(self.to_path)
-        self.timer.start(10)
-        self.capture = cv2.VideoCapture(0)
-        self.capture.set(cv2.CAP_PROP_FRAME_WIDTH, CAM_WIDTH)
-        self.capture.set(cv2.CAP_PROP_FRAME_HEIGHT, CAM_HEIGHT)
     def click_download(self):
-        self.timer.stop()
-        self.capture.release()
+        #self.timer.stop()
+        #self.capture.release()
         self.data_list = []
         for file in os.listdir(FROM_PATH + "/Excel"):
             if file.endswith(".xls") or file.endswith(".xlsx"):
                 self.data_list.append(file)
         download_window = DownloadWindow(self.data_list, self.to_path)
-        if download_window.exec_() == QDialog.Accepted:
-            self.timer.start(10)
-            self.capture = cv2.VideoCapture(0)
-            self.capture.set(cv2.CAP_PROP_FRAME_WIDTH, CAM_WIDTH)
-            self.capture.set(cv2.CAP_PROP_FRAME_HEIGHT, CAM_HEIGHT)
-        else:
-            self.timer.start(10)
-            self.capture = cv2.VideoCapture(0)
-            self.capture.set(cv2.CAP_PROP_FRAME_WIDTH, CAM_WIDTH)
-            self.capture.set(cv2.CAP_PROP_FRAME_HEIGHT, CAM_HEIGHT)
+        # if download_window.exec_() == QDialog.Accepted:
+        #     self.timer.start(10)
+        #     self.capture = cv2.VideoCapture(0)
+        #     self.capture.set(cv2.CAP_PROP_FRAME_WIDTH, CAM_WIDTH)
+        #     self.capture.set(cv2.CAP_PROP_FRAME_HEIGHT, CAM_HEIGHT)
+        # else:
+        #     self.timer.start(10)
+        #     self.capture = cv2.VideoCapture(0)
+        #     self.capture.set(cv2.CAP_PROP_FRAME_WIDTH, CAM_WIDTH)
+        #     self.capture.set(cv2.CAP_PROP_FRAME_HEIGHT, CAM_HEIGHT)
     def click_shutdown(self):
         if self.child_pid:
             os.kill(self.child_pid, signal.SIGTERM)
@@ -186,21 +191,22 @@ class MyMainWindow(QWidget):
         else:
             print("Child process PID not available")
             QMessageBox.about(self, "Notice", "No script to kill.\nExit GUI program and shut down the computer.")
-        self.timer.stop()
-        self.capture.release()
+        #self.timer.stop()
+        #self.capture.release()
         # tmp = input("SHUTDOWN?")
         os.system("shutdown -h now")
-    def update_frame(self):
-        ret, frame = self.capture.read()  # 카메라에서 프레임을 읽습니다.
-        if ret:
-            # OpenCV의 BGR 이미지를 PyQt에서 표시 가능한 RGB 이미지로 변환합니다.
-            frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            if self.is_it_reversed == 1:
-                frame_rgb = cv2.flip(frame_rgb, 0)
-            h, w, ch = frame_rgb.shape
-            bytes_per_line = ch * w
-            q_img = QImage(frame_rgb.data, w, h, bytes_per_line, QImage.Format_RGB888)
-            self.img_label.setPixmap(QPixmap.fromImage(q_img))
+
+    @pyqtSlot(np.ndarray)
+    def update_frame(self, frame):
+        # OpenCV의 BGR 이미지를 PyQt에서 표시 가능한 RGB 이미지로 변환합니다.
+        frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        if self.is_it_reversed == 1:
+            frame_rgb = cv2.flip(frame_rgb, 0)
+        h, w, ch = frame_rgb.shape
+        bytes_per_line = ch * w
+        q_img = QImage(frame_rgb.data, w, h, bytes_per_line, QImage.Format_RGB888)
+        self.img_label.setPixmap(QPixmap.fromImage(q_img))
+
     def mousePressEvent(self, event):
         if event.button() == Qt.LeftButton:
             if self.img_label.geometry().contains(event.pos()):
