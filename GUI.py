@@ -3,6 +3,8 @@ import os
 import sys
 import shutil as su
 import subprocess
+from time import sleep
+
 import cv2
 import numpy as np
 from PyQt5.QtWidgets import *
@@ -11,6 +13,7 @@ from PyQt5.QtGui import *
 import signal
 
 from grabber_basic import GrabberBasic
+from grabber_pothole import GrabberServer
 from videoadapter import VideoAdapter
 
 # 모니터 해상도 1920 * 1080 (100%) 고정
@@ -46,12 +49,13 @@ class MyMainWindow(QWidget):
         self.is_it_reversed = 0
 
         self.init_UI()
-        self.videoAdapt = VideoAdapter(CAM_WIDTH, CAM_HEIGHT)
+        self.videoAdapt = VideoAdapter()
         self.videoAdapt.changed_pixmap_sig.connect(self.update_frame)
 
-        self.videoAdapt.addVideoGrabber(GrabberBasic("basic"))
-
-        self.videoAdapt.start()
+        self.videoAdapt.addVideoGrabber(GrabberBasic("basic", CAM_WIDTH, CAM_HEIGHT))
+        self.videoAdapt.addVideoGrabber(GrabberServer('server'))
+        self.videoAdapt.runAdapter()
+        #self.videoAdapt.activeGrabber("basic")
 
 
     def init_UI(self):
@@ -148,6 +152,8 @@ class MyMainWindow(QWidget):
         self.btn_list[START].setEnabled(False)
         self.btn_list[STOP].setEnabled(True)
 
+        self.videoAdapt.activeGrabber("server")
+
     def click_stop(self):
         # self.timer.start(10)
         # self.capture = cv2.VideoCapture(0)
@@ -161,6 +167,7 @@ class MyMainWindow(QWidget):
         self.roi_box.setVisible(True)
         self.btn_list[START].setEnabled(True)
         self.btn_list[STOP].setEnabled(False)
+        self.videoAdapt.activeGrabber("basic")
     def click_select(self):
         #self.timer.stop()
         #self.capture.release()
