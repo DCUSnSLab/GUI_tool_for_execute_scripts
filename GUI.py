@@ -145,7 +145,7 @@ class MyMainWindow(QWidget):
         command = ["python3", "/home/youjeong/GUI_tool_for_execute_scripts/scripts/segnet-camera_last_last_soobintest.py", "--network=fcn-resnet18-cityscapes-1024x512", f"--x_coord={str(self.roi_coord[0])}", f"--y_coord={str(self.roi_coord[1])}", f"--reversed={str(self.is_it_reversed)}"]
         self.child_process = subprocess.Popen(command)
         self.child_pid = self.child_process.pid
-        self.is_it_reversed = 1
+        self.is_it_running = 1
         self.img_label.setVisible(True)
         self.roi_box.setVisible(False)
         self.btn_list[START].setEnabled(False)
