@@ -8,7 +8,7 @@ from time import sleep
 import cv2
 import numpy as np
 from PyQt5.QtWidgets import *
-from PyQt5.QtCore import Qt, QRectF, QTimer, pyqtSlot
+from PyQt5.QtCore import Qt, QRectF, QTimer, pyqtSlot, QThread
 from PyQt5.QtGui import *
 import signal
 
@@ -16,7 +16,7 @@ from grabber_basic import GrabberBasic
 from grabber_pothole import GrabberServer
 from videoadapter import VideoAdapter
 
-# 모니터 해상도 1920 * 1080 (100%) 고정
+# 모니터 해상도 및 카메라 해상도 1920 * 1080 (100%) 고정
 CAM_WIDTH = int(1920)
 CAM_HEIGHT = int(1080)
 CAM_SCALE = float(3 / 2)
@@ -24,7 +24,7 @@ CAM_SCALE = float(3 / 2)
 PREVIEW_WIDTH = int(1280)
 PREVIEW_HEIGHT = int(720)
 PREVIEW_SCALE = float(2 / 3)
-
+# ROI 박스 사이즈 1024 * 512(카메라 기준) 고정
 ROI_WIDTH = int(1024 * PREVIEW_SCALE)
 ROI_HEIGHT = int(512 * PREVIEW_SCALE)
 
@@ -49,14 +49,15 @@ class MyMainWindow(QWidget):
         self.is_it_reversed = 0
 
         self.init_UI()
+
         self.videoAdapt = VideoAdapter()
         self.videoAdapt.changed_pixmap_sig.connect(self.update_frame)
-
+        
         self.videoAdapt.addVideoGrabber(GrabberBasic("basic", CAM_WIDTH, CAM_HEIGHT))
         self.videoAdapt.addVideoGrabber(GrabberServer('server'))
+        
         self.videoAdapt.runAdapter()
         #self.videoAdapt.activeGrabber("basic")
-
 
     def init_UI(self):
         self.btn_list = [QPushButton("HORIZONTAL FLIP", self),
@@ -74,7 +75,7 @@ class MyMainWindow(QWidget):
         self.btn_list[4].setStyleSheet("background-color: #686868; color: white; font-size: 20px; font-weight: bold;")
         self.btn_list[5].clicked.connect(self.click_shutdown)
 
-        self.label_list = [QLabel("> ROI Box Coordinates: (   \t\t, \t\t   )", self),
+        self.label_list = [QLabel("> ROI Box Coordinates:", self),
                            QLabel("> Path to Download Data Files to", self)]
 
         self.x_info = QLineEdit("", self)
@@ -102,7 +103,7 @@ class MyMainWindow(QWidget):
         self.roi_box.setPen(QPen(Qt.green, 10, Qt.SolidLine))
         self.roi_coord = [int(self.clk_x * CAM_SCALE), int(self.clk_y * CAM_SCALE)]
         self.scene.addItem(self.roi_box)
-
+        
         self.x_info.setText(str(self.clk_x))
         self.y_info.setText(str(self.clk_y))
         self.path_info.setText(str(os.path.abspath(self.to_path)))
@@ -141,12 +142,11 @@ class MyMainWindow(QWidget):
         # 자식 프로세스는 매개변수로 x/y좌표, 상하반전여부를 받아가야 함. 자식 프로세스에서 실행할 스크립트에 맞게 매개변수 작성할 것.
         #self.timer.stop()
         #self.capture.release()
-        command = ["python3", "/home/snslab/Pothole/jetson-inference/build/aarch64/bin/Creat_GUI/GUI_tool_for_execute_scripts/test/segnet-camera_last_last_soobintest.py", "--network=fcn-resnet18-cityscapes-1024x512",
-                   f"--x_coord={str(self.roi_coord[0])}", f"--y_coord={str(self.roi_coord[1])}",
-                   f"--reversed={str(self.is_it_reversed)}"]
+	# command = ["python3", "/home/snslab/Pothole/jetson-inference/build/aarch64/bin/Creat_GUI/GUI_tool_for_execute_scripts/test/segnet-camera_last_last_soobintest.py", "--network=fcn-resnet18-cityscapes-1024x512",
+        command = ["python3", "/home/youjeong/GUI_tool_for_execute_scripts/scripts/segnet-camera_last_last_soobintest.py", "--network=fcn-resnet18-cityscapes-1024x512", f"--x_coord={str(self.roi_coord[0])}", f"--y_coord={str(self.roi_coord[1])}", f"--reversed={str(self.is_it_reversed)}"]
         self.child_process = subprocess.Popen(command)
         self.child_pid = self.child_process.pid
-
+		
         self.img_label.setVisible(True)
         self.roi_box.setVisible(False)
         self.btn_list[START].setEnabled(False)
@@ -174,34 +174,24 @@ class MyMainWindow(QWidget):
         self.to_path = QFileDialog.getExistingDirectory(None, "USB-Path to COPY(MOVE) Data File", ".")
         self.path_info.setText(self.to_path)
     def click_download(self):
-        #self.timer.stop()
-        #self.capture.release()
         self.data_list = []
         for file in os.listdir(FROM_PATH + "/Excel"):
             if file.endswith(".xls") or file.endswith(".xlsx"):
                 self.data_list.append(file)
         download_window = DownloadWindow(self.data_list, self.to_path)
-        # if download_window.exec_() == QDialog.Accepted:
-        #     self.timer.start(10)
-        #     self.capture = cv2.VideoCapture(0)
-        #     self.capture.set(cv2.CAP_PROP_FRAME_WIDTH, CAM_WIDTH)
-        #     self.capture.set(cv2.CAP_PROP_FRAME_HEIGHT, CAM_HEIGHT)
-        # else:
-        #     self.timer.start(10)
-        #     self.capture = cv2.VideoCapture(0)
-        #     self.capture.set(cv2.CAP_PROP_FRAME_WIDTH, CAM_WIDTH)
-        #     self.capture.set(cv2.CAP_PROP_FRAME_HEIGHT, CAM_HEIGHT)
+        if download_window.exec_() == QDialog.Accepted:
+            pass
     def click_shutdown(self):
-        if self.child_pid:
-            os.kill(self.child_pid, signal.SIGTERM)
-            QMessageBox.about(self, "Notice", "Script is killed.\nExit GUI program and shut down the computer.")
-        else:
-            print("Child process PID not available")
-            QMessageBox.about(self, "Notice", "No script to kill.\nExit GUI program and shut down the computer.")
-        #self.timer.stop()
-        #self.capture.release()
-        # tmp = input("SHUTDOWN?")
-        os.system("shutdown -h now")
+        qm = QMessageBox
+        ret = qm.question(self, 'Notice', "Are you sure to KILL all scripts and SHUTDOWN computer?", qm.Yes | qm.No)
+        if ret == qm.Yes:
+            os.system("shutdown -h now")
+            if self.child_pid:
+                os.kill(self.child_pid, signal.SIGTERM)
+                QMessageBox.about(self, "Notice", "Script is killed.\nExit GUI program and shut down the computer.")
+            else:
+                print("Child process PID not available")
+                QMessageBox.about(self, "Notice", "No script to kill.\nExit GUI program and shut down the computer.")
 
     @pyqtSlot(np.ndarray)
     def update_frame(self, frame):
@@ -212,7 +202,8 @@ class MyMainWindow(QWidget):
         h, w, ch = frame_rgb.shape
         bytes_per_line = ch * w
         q_img = QImage(frame_rgb.data, w, h, bytes_per_line, QImage.Format_RGB888)
-        self.img_label.setPixmap(QPixmap.fromImage(q_img))
+        q_img_resized = q_img.scaled(PREVIEW_WIDTH, PREVIEW_HEIGHT, Qt.KeepAspectRatio)
+        self.img_label.setPixmap(QPixmap.fromImage(q_img_resized))
 
     def mousePressEvent(self, event):
         if event.button() == Qt.LeftButton:
@@ -420,6 +411,14 @@ class DownloadWindow(QDialog):
         for file in os.listdir(FROM_PATH + "/Excel"):
             if file.endswith(".xls") or file.endswith(".xlsx"):
                 self.data_list.append(file)
+
+class QMessageBoxThread(QThread):
+    def __init__(self, msg_box):
+        super().__init__()
+        self.msg_box = msg_box
+        
+    def run(self):
+        self.msg_box.exec_()
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
