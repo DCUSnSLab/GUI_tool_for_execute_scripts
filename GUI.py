@@ -206,7 +206,7 @@ class MyMainWindow(QWidget):
         self.img_label.setPixmap(QPixmap.fromImage(q_img_resized))
 
     def mousePressEvent(self, event):
-        if event.button() == Qt.LeftButton and self.is_it_running:
+        if event.button() == Qt.LeftButton and not self.is_it_running:
             if self.img_label.geometry().contains(event.pos()):
                 if event.pos().x() > 1280 - ROI_WIDTH and event.pos().y() > 720 - ROI_HEIGHT:
                     self.clk_x = 1280 - ROI_WIDTH
