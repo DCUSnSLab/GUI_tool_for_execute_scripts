@@ -47,6 +47,7 @@ class MyMainWindow(QWidget):
         self.to_path = ".."
         self.data_list = []
         self.is_it_reversed = 0
+        self.is_it_running = 0
 
         self.init_UI()
 
@@ -140,13 +141,11 @@ class MyMainWindow(QWidget):
         # self.roi_coord[0]이 x 좌표, self.roi_coord[1]이 y 좌표임.
         # self.is_it_reversed 변수는 정수 형태의 이진 변수로, 1이면 상하반전된 상태, 0이면 정방향 상태임.
         # 자식 프로세스는 매개변수로 x/y좌표, 상하반전여부를 받아가야 함. 자식 프로세스에서 실행할 스크립트에 맞게 매개변수 작성할 것.
-        #self.timer.stop()
-        #self.capture.release()
-	# command = ["python3", "/home/snslab/Pothole/jetson-inference/build/aarch64/bin/Creat_GUI/GUI_tool_for_execute_scripts/test/segnet-camera_last_last_soobintest.py", "--network=fcn-resnet18-cityscapes-1024x512",
+        # command = ["python3", "/home/snslab/Pothole/jetson-inference/build/aarch64/bin/Creat_GUI/GUI_tool_for_execute_scripts/test/segnet-camera_last_last_soobintest.py", "--network=fcn-resnet18-cityscapes-1024x512",
         command = ["python3", "/home/youjeong/GUI_tool_for_execute_scripts/scripts/segnet-camera_last_last_soobintest.py", "--network=fcn-resnet18-cityscapes-1024x512", f"--x_coord={str(self.roi_coord[0])}", f"--y_coord={str(self.roi_coord[1])}", f"--reversed={str(self.is_it_reversed)}"]
         self.child_process = subprocess.Popen(command)
         self.child_pid = self.child_process.pid
-		
+        self.is_it_reversed = 1
         self.img_label.setVisible(True)
         self.roi_box.setVisible(False)
         self.btn_list[START].setEnabled(False)
@@ -163,6 +162,7 @@ class MyMainWindow(QWidget):
             os.kill(self.child_pid, signal.SIGTERM)
         else:
             print("Child process PID not available")
+        self.is_it_running = 0
         self.img_label.setVisible(True)
         self.roi_box.setVisible(True)
         self.btn_list[START].setEnabled(True)
@@ -206,7 +206,7 @@ class MyMainWindow(QWidget):
         self.img_label.setPixmap(QPixmap.fromImage(q_img_resized))
 
     def mousePressEvent(self, event):
-        if event.button() == Qt.LeftButton:
+        if event.button() == Qt.LeftButton and self.is_it_running:
             if self.img_label.geometry().contains(event.pos()):
                 if event.pos().x() > 1280 - ROI_WIDTH and event.pos().y() > 720 - ROI_HEIGHT:
                     self.clk_x = 1280 - ROI_WIDTH
