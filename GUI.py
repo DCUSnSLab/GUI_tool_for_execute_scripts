@@ -282,7 +282,7 @@ class DownloadWindow(QDialog):
         self.setLayout(main_layout)
         self.setWindowTitle("COPY or MOVE DATA FILES to USB")
         self.setFixedSize(1800, 1000)
-        self.setFont(QFont("Arial", 10))
+        self.setFont(QFont("Arial", 22))
         self.show()
     def set_window_center(self):
         qr = self.frameGeometry()
