@@ -8,7 +8,7 @@ from time import sleep
 import cv2
 import numpy as np
 from PyQt5.QtWidgets import *
-from PyQt5.QtCore import Qt, QRectF, QTimer, pyqtSlot, QThread
+from PyQt5.QtCore import Qt, QRectF, QTimer, pyqtSlot, QThread, QSize
 from PyQt5.QtGui import *
 import signal
 
@@ -37,7 +37,8 @@ SELECT = 3
 DOWN = 4
 SHUTDOWN = 5
 
-FROM_PATH = "./Result"
+DEFAULT_FROM_PATH = "./Result"
+DEFAULT_TO_PATH = "/media/snslab/**edit**"  # **edit**
 
 class MyMainWindow(QWidget):
     def __init__(self):
@@ -47,6 +48,7 @@ class MyMainWindow(QWidget):
         self.to_path = ".."
         self.data_list = []
         self.is_it_reversed = 0
+        self.is_it_running = 0
 
         self.init_UI()
 
@@ -140,13 +142,11 @@ class MyMainWindow(QWidget):
         # self.roi_coord[0]이 x 좌표, self.roi_coord[1]이 y 좌표임.
         # self.is_it_reversed 변수는 정수 형태의 이진 변수로, 1이면 상하반전된 상태, 0이면 정방향 상태임.
         # 자식 프로세스는 매개변수로 x/y좌표, 상하반전여부를 받아가야 함. 자식 프로세스에서 실행할 스크립트에 맞게 매개변수 작성할 것.
-        #self.timer.stop()
-        #self.capture.release()
-	# command = ["python3", "/home/snslab/Pothole/jetson-inference/build/aarch64/bin/Creat_GUI/GUI_tool_for_execute_scripts/test/segnet-camera_last_last_soobintest.py", "--network=fcn-resnet18-cityscapes-1024x512",
+        # command = ["python3", "/home/snslab/Pothole/jetson-inference/build/aarch64/bin/Creat_GUI/GUI_tool_for_execute_scripts/test/segnet-camera_last_last_soobintest.py", "--network=fcn-resnet18-cityscapes-1024x512",
         command = ["python3", "/home/youjeong/GUI_tool_for_execute_scripts/scripts/segnet-camera_last_last_soobintest.py", "--network=fcn-resnet18-cityscapes-1024x512", f"--x_coord={str(self.roi_coord[0])}", f"--y_coord={str(self.roi_coord[1])}", f"--reversed={str(self.is_it_reversed)}"]
         self.child_process = subprocess.Popen(command)
         self.child_pid = self.child_process.pid
-		
+        self.is_it_running = 1
         self.img_label.setVisible(True)
         self.roi_box.setVisible(False)
         self.btn_list[START].setEnabled(False)
@@ -163,6 +163,7 @@ class MyMainWindow(QWidget):
             os.kill(self.child_pid, signal.SIGTERM)
         else:
             print("Child process PID not available")
+        self.is_it_running = 0
         self.img_label.setVisible(True)
         self.roi_box.setVisible(True)
         self.btn_list[START].setEnabled(True)
@@ -175,7 +176,7 @@ class MyMainWindow(QWidget):
         self.path_info.setText(self.to_path)
     def click_download(self):
         self.data_list = []
-        for file in os.listdir(FROM_PATH + "/Excel"):
+        for file in os.listdir(DEFAULT_FROM_PATH + "/Excel"):
             if file.endswith(".xls") or file.endswith(".xlsx"):
                 self.data_list.append(file)
         download_window = DownloadWindow(self.data_list, self.to_path)
@@ -206,7 +207,7 @@ class MyMainWindow(QWidget):
         self.img_label.setPixmap(QPixmap.fromImage(q_img_resized))
 
     def mousePressEvent(self, event):
-        if event.button() == Qt.LeftButton:
+        if event.button() == Qt.LeftButton and not self.is_it_running:
             if self.img_label.geometry().contains(event.pos()):
                 if event.pos().x() > 1280 - ROI_WIDTH and event.pos().y() > 720 - ROI_HEIGHT:
                     self.clk_x = 1280 - ROI_WIDTH
@@ -242,9 +243,11 @@ class DownloadWindow(QDialog):
         self.data_model = QStandardItemModel()
         self.data_model.setColumnCount(1)
         self.data_model.setHorizontalHeaderLabels(["Select", "File Name"])
-        for file in self.data_list:
-            item = QStandardItem(file)
+
+        for i in range(len(self.data_list)):
+            item = QStandardItem(self.data_list[i])
             item.setCheckable(True)
+            item.setEditable(False)
             self.data_model.appendRow(item)
 
         self.select_all_btn = QPushButton("Select All", self)
@@ -282,7 +285,7 @@ class DownloadWindow(QDialog):
         self.setLayout(main_layout)
         self.setWindowTitle("COPY or MOVE DATA FILES to USB")
         self.setFixedSize(1800, 1000)
-        self.setFont(QFont("Arial", 10))
+        self.setFont(QFont("Arial", 22))
         self.show()
     def set_window_center(self):
         qr = self.frameGeometry()
@@ -311,7 +314,7 @@ class DownloadWindow(QDialog):
         for i in range(len(self.data_list)):
             if self.data_model.item(i, 0).checkState() == 2:
                 try:
-                    su.copy(os.path.join(FROM_PATH + "/Excel", self.data_model.item(i, 0).text()), os.path.join(self.to_path, self.data_model.item(i, 0).text()))
+                    su.copy(os.path.join(DEFAULT_FROM_PATH + "/Excel", self.data_model.item(i, 0).text()), os.path.join(self.to_path, self.data_model.item(i, 0).text()))
                 except FileNotFoundError:
                     QMessageBox.about(self, "Error !", "File {0} not found.\nProceed to next task without copying this file.".format(self.data_model.item(i, 0).text()))
                     print("File not found")
@@ -322,9 +325,9 @@ class DownloadWindow(QDialog):
                     QMessageBox.about(self, "Error !", "Permission denied!\nProceed to next task without copying this file.")
                     print("Permission denied !")
                 try:
-                    su.copytree(FROM_PATH + "/full_frame_detect/" + self.data_model.item(i, 0).text().split('.')[0], self.to_path + "/" + self.data_model.item(i, 0).text().split('.')[0])
+                    su.copytree(DEFAULT_FROM_PATH + "/full_frame_detect/" + self.data_model.item(i, 0).text().split('.')[0], self.to_path + "/" + self.data_model.item(i, 0).text().split('.')[0])
                 except FileNotFoundError:
-                    QMessageBox.about(self, "Error !", "Directory {0} not found.\nProceed to next task without copying directory connected this file.".format(self.data_model.item(i, 0).text().split('.')[0]))
+                    QMessageBox.about(self, "Error !", "Directory {0}/full_frame_detect/{1} not found.\nProceed to next task without copying directory connected this file.".format(DEFAULT_FROM_PATH, self.data_model.item(i, 0).text().split('.')[0]))
                     print("Directory not found")
                 except Exception as e:
                     QMessageBox.about(self, "Error !", "An error occurred while copying directory {0}.\nProceed to next task without copying this directory.".format(self.data_model.item(i, 0).text().split('.')[0]))
@@ -340,7 +343,7 @@ class DownloadWindow(QDialog):
         for i in range(len(self.data_list)):
             if self.data_model.item(i, 0).checkState() == 2:
                 try:
-                    su.move(os.path.join(FROM_PATH + "/Excel", self.data_model.item(i, 0).text()), os.path.join(self.to_path, self.data_model.item(i, 0).text()))
+                    su.move(os.path.join(DEFAULT_FROM_PATH + "/Excel", self.data_model.item(i, 0).text()), os.path.join(self.to_path, self.data_model.item(i, 0).text()))
                 except FileNotFoundError:
                     QMessageBox.about(self, "Error !", "File {0} not found.\nProceed to next task without moving this file.".format(self.data_model.item(i, 0).text()))
                     print("File not found")
@@ -351,10 +354,9 @@ class DownloadWindow(QDialog):
                     QMessageBox.about(self, "Error !", "Permission denied!\nProceed to next task without moving this file.")
                     print("Permission denied !")
                 try:
-                    su.move(FROM_PATH + "/full_frame_detect/" + self.data_model.item(i, 0).text().split('.')[0], self.to_path + "/" + self.data_model.item(i, 0).text().split('.')[0])
+                    su.move(DEFAULT_FROM_PATH + "/full_frame_detect/" + self.data_model.item(i, 0).text().split('.')[0], self.to_path + "/" + self.data_model.item(i, 0).text().split('.')[0])
                 except FileNotFoundError:
-                    QMessageBox.about(self, "Error !", "Directory {0} not found.\nProceed to next task without moving directory connected this file.".format(self.data_model.item(i, 0).text().split('.')[0]))
-                    print("Directory not found")
+                    QMessageBox.about(self, "Error !", "Directory {0}/full_frame_detect/{1} not found.\nProceed to next task without moving directory connected this file.".format(DEFAULT_FROM_PATH, self.data_model.item(i, 0).text().split('.')[0]))
                 except Exception as e:
                     QMessageBox.about(self, "Error !", "An error occurred while moving directory {0}.\nProceed to next task without moving this directory.".format(self.data_model.item(i, 0).text().split('.')[0]))
                     print("An error occurred", e)
@@ -370,7 +372,7 @@ class DownloadWindow(QDialog):
         for i in range(len(self.data_list)):
             if self.data_model.item(i, 0).checkState() == 2:
                 try:
-                    os.remove(os.path.join(FROM_PATH + "/Excel", self.data_model.item(i, 0).text()))
+                    os.remove(os.path.join(DEFAULT_FROM_PATH + "/Excel", self.data_model.item(i, 0).text()))
                 except FileNotFoundError:
                     QMessageBox.about(self, "Error !", "File {0} not found.\nProceed to next task without deleting this file.".format(self.data_model.item(i, 0).text()))
                     print("File not found")
@@ -381,9 +383,9 @@ class DownloadWindow(QDialog):
                     QMessageBox.about(self, "Error !", "Permission denied!\nProceed to next task without deleting this file.")
                     print("Permission denied !")
                 try:
-                    su.rmtree(FROM_PATH + "/full_frame_detect/" + self.data_model.item(i, 0).text().split('.')[0])
+                    su.rmtree(DEFAULT_FROM_PATH + "/full_frame_detect/" + self.data_model.item(i, 0).text().split('.')[0])
                 except FileNotFoundError:
-                    QMessageBox.about(self, "Error !", "Directory {0} not found.\nProceed to next task without deleting directory connected this file.".format(self.data_model.item(i, 0).text().split('.')[0]))
+                    QMessageBox.about(self, "Error !", "Directory {0}/full_frame_detect/{1} not found.\nProceed to next task without deleting directory connected this file.".format(DEFAULT_FROM_PATH, self.data_model.item(i, 0).text().split('.')[0]))
                     print("Directory not found")
                 except Exception as e:
                     QMessageBox.about(self, "Error !", "An error occurred while deleting directory {0}.\nProceed to next task without deleting this directory.".format(self.data_model.item(i, 0).text().split('.')[0]))
@@ -405,10 +407,11 @@ class DownloadWindow(QDialog):
         for file in self.data_list:
             item = QStandardItem(file)
             item.setCheckable(True)
+            item.setEditable(False)
             self.data_model.appendRow(item)
     def get_data_files(self):
         self.data_list = []
-        for file in os.listdir(FROM_PATH + "/Excel"):
+        for file in os.listdir(DEFAULT_FROM_PATH + "/Excel"):
             if file.endswith(".xls") or file.endswith(".xlsx"):
                 self.data_list.append(file)
 

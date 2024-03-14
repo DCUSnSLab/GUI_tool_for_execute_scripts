@@ -1,41 +1,43 @@
-import sys
-
-from PyQt5.QtGui import QPainter
-from PyQt5.QtWidgets import QApplication, QGraphicsView, QGraphicsScene, QGraphicsRectItem
+from PyQt5.QtWidgets import *
 from PyQt5.QtCore import Qt
+from PyQt5.QtGui import QPainter
+import cv2
+import numpy as np
+from PyQt5.QtWidgets import *
+from PyQt5.QtCore import Qt, QRectF, QTimer, pyqtSlot, QThread, QSize
+from PyQt5.QtGui import *
+from PyQt5.QtGui import QPainter
+import signal
 
-class MyGraphicsView(QGraphicsView):
-    def __init__(self):
-        super().__init__()
-        self.scene = QGraphicsScene(self)
-        self.setScene(self.scene)
 
-        # QGraphicsRectItem 생성
-        self.rect_item = QGraphicsRectItem(0, 0, 100, 100)
-        self.scene.addItem(self.rect_item)
+class CheckboxDelegate(QStyledItemDelegate):
+    def paint(self, painter, option, index):
+        # Only paint checkboxes
+        if index.column() == 0 and index.data(Qt.CheckStateRole):
+            checked = index.data(Qt.CheckStateRole) == Qt.Checked
+            checkbox_rect = option.rect.adjusted(5, 0, -5, 0)  # Adjust checkbox size here
+            checkbox_option = QStyleOptionButton()
+            checkbox_option.rect = checkbox_rect
+            checkbox_option.state = QStyleOptionButton.State_Enabled | (
+                QStyleOptionButton.State_On if checked else QStyleOptionButton.State_Off)
+            QApplication.style().drawControl(QStyleOptionButton.CheckBox, checkbox_option, painter)
 
-        self.setDragMode(QGraphicsView.ScrollHandDrag)  # 드래그 모드 설정
-        self.setRenderHint(QPainter.Antialiasing)  # 안티앨리어싱 활성화
 
-    def mousePressEvent(self, event):
-        if event.buttons() == Qt.LeftButton:
-            # 왼쪽 버튼을 눌렀을 때, 그래픽 항목 이동 시작
-            self.orig_pos = event.pos()
-            self.orig_rect_pos = self.rect_item.pos()
+# Example usage
+if __name__ == "__main__":
+    app = QApplication([])
 
-        super().mousePressEvent(event)
+    model = QStandardItemModel(4, 1)
+    for row in range(4):
+        item = QStandardItem()  # Create a new QStandardItem object
+        item.setCheckable(True)
+        item.setText(f"Item {row + 1}")
+        model.setItem(row, 0, item)  # Set the item in the model
 
-    def mouseMoveEvent(self, event):
-        if event.buttons() == Qt.LeftButton:
-            # 왼쪽 버튼을 누른 상태에서 마우스 이동시, 그래픽 항목 이동
-            delta = event.pos() - self.orig_pos
-            new_pos = self.orig_rect_pos + delta
-            self.rect_item.setPos(new_pos)
+    listView = QListView()
+    listView.setModel(model)
+    delegate = CheckboxDelegate()
+    listView.setItemDelegate(delegate)
 
-        super().mouseMoveEvent(event)
-
-if __name__ == '__main__':
-    app = QApplication(sys.argv)
-    view = MyGraphicsView()
-    view.show()
-    sys.exit(app.exec_())
+    listView.show()
+    app.exec_()
