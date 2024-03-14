@@ -1,8 +1,8 @@
 from time import sleep
 
 from videograbber import VideoGrabber
-from numpysocket import NumpySocket
-
+# from numpysocket import NumpySocket
+import numpysocket
 class GrabberServer(VideoGrabber):
     def __init__(self, key):
         super().__init__(key, False)
@@ -11,7 +11,7 @@ class GrabberServer(VideoGrabber):
         print('init Process Server Cam!!')
 
     def runProc(self):
-        with NumpySocket() as s:
+        with numpySocket() as s:
             s.bind(("", 9999))
 
             while True:
