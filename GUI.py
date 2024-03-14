@@ -273,12 +273,16 @@ class DownloadWindow(QDialog):
         self.btn_layout.addWidget(self.delete_btn)
         self.btn_layout.addWidget(self.finish_btn)
 
+        #self.list_layout = QGridLayout(self)
         self.list_view = QListView()
         self.list_view.setModel(self.data_model)
+        self.list_view.clicked.connect(self.on_item_clicked)
+        #self.list_layout.addWidget(self.list_view)
 
         main_layout = QVBoxLayout(self)
         # main_layout.addWidget(QLabel(self.from_path.split('/')[-1] + " -> " + self.to_path.split('/')[-1]))
         main_layout.addLayout(self.tool_layout)
+        #main_layout.addLayout(self.list_layout)
         main_layout.addWidget(self.list_view)
         main_layout.addLayout(self.btn_layout)
 
@@ -312,7 +316,7 @@ class DownloadWindow(QDialog):
         self.count_checks()
         self.lock_buttons()
         for i in range(len(self.data_list)):
-            if self.data_model.item(i, 0).checkState() == 2:
+            if self.data_model.item(i, 0).checkState() == Qt.Checked:
                 try:
                     su.copy(os.path.join(DEFAULT_FROM_PATH + "/Excel", self.data_model.item(i, 0).text()), os.path.join(self.to_path, self.data_model.item(i, 0).text()))
                 except FileNotFoundError:
@@ -341,7 +345,7 @@ class DownloadWindow(QDialog):
         self.count_checks()
         self.lock_buttons()
         for i in range(len(self.data_list)):
-            if self.data_model.item(i, 0).checkState() == 2:
+            if self.data_model.item(i, 0).checkState() == Qt.Checked:
                 try:
                     su.move(os.path.join(DEFAULT_FROM_PATH + "/Excel", self.data_model.item(i, 0).text()), os.path.join(self.to_path, self.data_model.item(i, 0).text()))
                 except FileNotFoundError:
@@ -370,7 +374,7 @@ class DownloadWindow(QDialog):
         self.count_checks()
         self.lock_buttons()
         for i in range(len(self.data_list)):
-            if self.data_model.item(i, 0).checkState() == 2:
+            if self.data_model.item(i, 0).checkState() == Qt.Checked:
                 try:
                     os.remove(os.path.join(DEFAULT_FROM_PATH + "/Excel", self.data_model.item(i, 0).text()))
                 except FileNotFoundError:
@@ -399,8 +403,15 @@ class DownloadWindow(QDialog):
     def click_finish(self):
         self.accept()
     def select_all(self):
+        mode = "SELECT"
         for i in range(len(self.data_list)):
-            self.data_model.item(i, 0).setCheckState(Qt.Checked)
+            if self.data_model.item(i, 0).checkState() == Qt.Checked:
+                mode = "UNSELECT"
+        for i in range(len(self.data_list)):
+            if mode == "UNSELECT":
+                self.data_model.item(i, 0).setCheckState(Qt.Unchecked)
+            elif mode == "SELECT":
+                self.data_model.item(i, 0).setCheckState(Qt.Checked)
     def refresh_list(self):
         self.get_data_files()
         self.data_model.clear()
@@ -414,6 +425,11 @@ class DownloadWindow(QDialog):
         for file in os.listdir(DEFAULT_FROM_PATH + "/Excel"):
             if file.endswith(".xls") or file.endswith(".xlsx"):
                 self.data_list.append(file)
+    def on_item_clicked(self, index):
+        if self.data_model.itemFromIndex(index).checkState() == Qt.Unchecked:
+            self.data_model.itemFromIndex(index).setCheckState(Qt.Checked)
+        elif self.data_model.itemFromIndex(index).checkState() == Qt.Checked:
+            self.data_model.itemFromIndex(index).setCheckState(Qt.Unchecked)
 
 class QMessageBoxThread(QThread):
     def __init__(self, msg_box):
